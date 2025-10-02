@@ -1,0 +1,22 @@
+# Environment
+.env
+
+# Reports and caches
+reports/
+.cache/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# macOS
+.DS_Store
+
+# Python build
+*.egg-info/
+dist/
+build/
+
+# Temporary/vendor
+temp/
+
