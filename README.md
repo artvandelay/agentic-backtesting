@@ -109,6 +109,7 @@ RSI Mean Reversion
 💭 You: Create RSI strategy for NVDA: buy when RSI < 30, sell when RSI > 70, 2023, $20,000
 ```
 
+**Sample outputs**: See `reports/EXAMPLE_*.md` for actual generated reports.  
 More: see developer notes in `REPO_NOTES.md`.
 
 ## Troubleshooting
