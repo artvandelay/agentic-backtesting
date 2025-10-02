@@ -4,6 +4,13 @@ import subprocess
 import os
 from typing import List, Dict
 
+# Auto-load .env if available (non-fatal if missing)
+try:
+    from dotenv import load_dotenv  # type: ignore
+    load_dotenv()
+except Exception:
+    pass
+
 
 class LLM:
     """Simple LLM wrapper."""

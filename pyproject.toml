@@ -13,6 +13,8 @@ dependencies = [
     "yfinance",
     "backtesting",
     "ta",
+    "llm",
+    "python-dotenv",
 ]
 
 [project.scripts]
