@@ -1,14 +1,26 @@
 # NLBT — Natural Language Backtesting (WIP)
 
-Experimental, work‑in‑progress tool. Not verified or production‑ready.
+**Turn plain English into professional backtesting reports in minutes.**
 
-Describe a trading strategy in plain English. NLBT uses the `llm` CLI (Simon Willison) to:
-- Ask clarifying questions
-- Generate Python backtesting code
-- Run it locally and save a markdown report in `reports/`
+Describe any trading strategy in natural language → Get Python code, backtest results, and a professional markdown report. No coding required.
+
+**Cost**: <$1 to run all examples with OpenRouter  
+**Time**: 2-3 minutes per strategy  
+**Output**: Professional reports with metrics, code, and insights
 
 ## ⚠️ Safety Warning
 **This tool runs generated Python code locally. Do not paste untrusted code or run on sensitive systems.**
+
+## What You Get
+
+**Input**: "Buy and hold AAPL in 2024 with $10,000"  
+**Output**: Professional report with:
+- 📊 Performance metrics (38.88% return, Sharpe 1.25, Max DD -15.26%)
+- 📈 Full backtest results and analysis  
+- 💻 Complete Python code for reproducibility
+- 📄 Markdown report ready to share
+
+**Sample outputs**: See `reports/EXAMPLE_*.md` for actual generated reports.
 
 ## Status
 - WIP; APIs, prompts, and behavior may change without notice
@@ -16,47 +28,57 @@ Describe a trading strategy in plain English. NLBT uses the `llm` CLI (Simon Wil
 
 ## Requirements
 - Python 3.8+
-- `llm` CLI and an API key (OpenAI, Anthropic, or OpenRouter)
+- OpenRouter account (recommended) or OpenAI/Anthropic
+- 5 minutes for setup
 
-## Install
+## Install & Setup
 
-### 1. Clone and install
+### 1. Clone and install everything
 ```bash
 git clone https://github.com/artvandelay/agentic-backtesting
 cd agentic-backtesting
 pip install -e .
 ```
+*This installs all dependencies including `llm` CLI and `python-dotenv`*
 
-### 2. Install additional dependencies
-```bash
-pip install llm python-dotenv
-```
+### 2. Set up OpenRouter (recommended)
+**Why OpenRouter?** Cost control, multiple models, spending limits
 
-### 3. Configure LLM provider
+1. **Create account**: Go to https://openrouter.ai/
+2. **Get API key**: Click "Keys" → "Create Key" 
+3. **Add credits**: Add $5-10 (you'll use <$1 for examples)
+4. **Set spending limit**: Optional but recommended
+5. **Configure locally**:
 ```bash
-# Recommended: OpenRouter (cost control, multiple models)
 llm keys set openrouter
+# Paste your API key when prompted
+
 llm models default openrouter/anthropic/claude-3.5-sonnet
-
-# Alternatives:
-# llm keys set openai
-# llm keys set anthropic
 ```
 
-**Cost note**: Running all examples costs <$1 with OpenRouter. Set spending limits in your provider dashboard.
-
-### 4. Optional: Environment setup
-```bash
-cp env.example .env
-# Edit .env to set LLM_MODEL if desired
-```
-
-### 5. Quick test
+### 3. Quick test
 ```bash
 nlbt
-# Try: "Buy and hold AAPL in 2024 with $1000"
-# Should ask clarifying questions, generate code, save report
 ```
+**Try**: "Buy and hold AAPL in 2024 with $1000"
+
+**What you should see**:
+- Agent asks clarifying questions (if needed)
+- Shows "Phase 1 - Understanding" → "Phase 2 - Implementation" → "Phase 3 - Reporting"  
+- Saves report to `reports/backtest_YYYYMMDD_HHMMSS.md`
+- Takes 2-3 minutes total
+
+## How it works (3-phase conversation)
+
+**Phase 1 - Understanding**: Agent gathers requirements:
+- Ticker symbol (e.g., AAPL, SPY)
+- Time period (e.g., "2024", "2020-2023") 
+- Capital amount (e.g., "$10,000")
+- Strategy description (your trading rules)
+
+**Phase 2 - Implementation**: Agent generates Python code, runs it in sandbox, critiques results. Auto-retries up to 3 times if errors occur.
+
+**Phase 3 - Reporting**: Agent plans and writes a professional markdown report with metrics and full code.
 
 ## Use
 ```bash
@@ -70,47 +92,34 @@ nlbt                    # Start interactive session
 
 Reports are written to `reports/backtest_YYYYMMDD_HHMMSS.md`.
 
-## How it works (3-phase conversation)
+## Examples (realistic conversations)
 
-**Phase 1 - Understanding**: Agent asks questions until it has:
-- Ticker symbol (e.g., AAPL, SPY)
-- Time period (e.g., "2024", "2020-2023") 
-- Capital amount (e.g., "$10,000")
-- Strategy description (your trading rules)
-
-**Phase 2 - Implementation**: Agent generates Python code, runs it in sandbox, critiques results. Up to 3 attempts if errors occur.
-
-**Phase 3 - Reporting**: Agent plans and writes a professional markdown report with metrics and full code.
-
-## Examples (curated)
-
-Buy & Hold
+**Simple Buy & Hold**
 ```
 💭 You: Buy and hold AAPL in 2024 with $10,000
-🤖 Agent: I have everything needed. Ready to proceed? (yes/go)
+🤖 Agent: STATUS: READY - I have everything needed. Ready to proceed?
 💭 You: yes
-⚙️ Agent: [Generates code → executes → ✓]
+⚙️ Agent: [Generates code → executes → ✓] 
 📊 Agent: [Writes report → saves to reports/]
+✅ Report saved: reports/backtest_20241002_123456.md
 ```
 
-Moving Average Crossover
-```
-💭 You: Backtest a 50/200 day MA crossover on SPY for 2024 with $25,000
-🤖 Agent: [Same flow - understand → implement → report]
-```
-
-Bollinger Bands
-```
-💭 You: Test TSLA with Bollinger Bands in 2024, buy lower band, sell upper band, $15,000
-```
-
-RSI Mean Reversion
+**RSI Strategy** 
 ```
 💭 You: Create RSI strategy for NVDA: buy when RSI < 30, sell when RSI > 70, 2023, $20,000
+🤖 Agent: STATUS: READY - All requirements complete!
+💭 You: go
+⚙️ Agent: [Implementation → 45.75% return, 100% win rate]
+📊 Agent: [Professional report with insights]
 ```
 
-**Sample outputs**: See `reports/EXAMPLE_*.md` for actual generated reports.  
-More: see developer notes in `REPO_NOTES.md`.
+**If agent needs more info**:
+```
+💭 You: Test a moving average strategy
+🤖 Agent: What ticker symbol? What time period? What capital amount? What MA periods?
+💭 You: SPY, 2024, $25K, use 50/200 day crossover  
+🤖 Agent: Perfect! Ready to proceed?
+```
 
 ## Troubleshooting
 
@@ -122,9 +131,9 @@ llm models default [model-name]    # Set default
 
 ### "LLM failed" or timeout
 - Check API key: `llm keys list`
+- Check OpenRouter credits/limits
 - Try simpler strategy description
 - Use `debug` command to see internal state
-- Check rate limits with your provider
 
 ### "No data found" error  
 - Verify ticker symbol (use Yahoo Finance format)
@@ -134,14 +143,28 @@ llm models default [model-name]    # Set default
 ### Code execution fails
 - Agent will auto-retry up to 3 times
 - If still failing, simplify your strategy
-- Check for typos in ticker/dates
 - Use `info` to see what requirements were gathered
+- Check for typos in ticker/dates
 
 ### General debugging
 - Use `info` command to see current phase
 - Use `debug` command to see conversation history
 - Check `reports/` folder for any partial outputs
 - Restart with `exit` and try again
+
+## Alternative LLM Providers
+
+**OpenAI**:
+```bash
+llm keys set openai
+llm models default gpt-4o-mini
+```
+
+**Anthropic**:
+```bash
+llm keys set anthropic  
+llm models default claude-3-5-sonnet-20241022
+```
 
 ## Project structure
 ```
