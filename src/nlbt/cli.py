@@ -9,7 +9,7 @@ def main():
     model = sys.argv[1] if len(sys.argv) > 1 else None
     engine = ReflectionEngine(model)
     
-    print("🧠 Backtesting Assistant")
+    print("🧠 Backtesting Assistant (WIP)")
     print(f"Chat model: {engine.llm.model}")
     print(f"Code model: {engine.code_llm.model} (strong model for implementation)")
     print()
@@ -18,14 +18,21 @@ def main():
     print("  Phase 2 (⚙️ Implementation): I'll generate, test, and refine code")
     print("  Phase 3 (📊 Reporting): I'll create a professional analysis report")
     print()
+    print("⚠️  Current limitations:")
+    print("  • Single ticker strategies work best (multi-asset may fail)")
+    print("  • Uses Yahoo Finance data (US stocks, ETFs, crypto with -USD suffix)")
+    print("  • Max 3 code generation attempts per strategy")
+    print("  • Requires LLM API access and credits")
+    print("  • Generated code runs locally (trusted environment only)")
+    print()
     print("💬 You can:")
-    print("  • Describe your strategy in plain English")
+    print("  • Describe your strategy in plain English (try: 'Buy SPY when RSI < 30')")
     print("  • Make changes anytime by saying 'actually...' or 'change...'")
     print("  • Type 'info' to see current phase and requirements")
     print("  • Type 'debug' if something goes wrong")
     print("  • Type 'exit' to quit")
     print()
-    print("🚀 Ready! Describe your trading strategy...")
+    print("🚀 Ready! Describe your single-ticker trading strategy...")
     
     while True:
         try:
