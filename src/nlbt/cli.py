@@ -113,6 +113,8 @@ def main():
                     print(f"\n❌ Last Error:\n{engine.last_error}")
                 if engine.results:
                     print(f"\n✅ Last Results:\n{engine.results[:300]}...")
+                if getattr(engine, 'last_validation', None) is not None:
+                    print(f"\n🔎 Last Validation:\n{engine.last_validation}")
                 print()
                 continue
             

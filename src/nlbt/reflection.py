@@ -35,6 +35,8 @@ class ReflectionEngine:
         self.code = ""
         self.results = ""
         self.last_error = ""
+        # Last validator decision for debugging
+        self.last_validation = None
     
     def chat(self, user_input: str) -> str:
         """Process user message, return agent response."""
@@ -134,10 +136,13 @@ RESPOND ONLY to the current user message. Do NOT create fake conversations."""
         has_capital = bool(self.requirements.get('capital'))
         has_strategy = bool(self.requirements.get('strategy'))
 
-        # If we have all requirements, force READY status
+        # If we have all requirements, validate against scaffold before READY
         if has_ticker and has_period and has_capital and has_strategy:
-            self.phase = "ready_to_implement"
-            return f"""STATUS: READY
+            validation = self._validate_requirements_with_codebase()
+            self.last_validation = validation
+            if validation.get("implementable"):
+                self.phase = "ready_to_implement"
+                return f"""STATUS: READY
 TICKER: {self.requirements['ticker']}
 PERIOD: {self.requirements['period']}
 CAPITAL: {self.requirements['capital']}
@@ -158,12 +163,19 @@ I'll create a Python backtesting strategy with these components:
 • Type "yes", "go", or "proceed" to start implementation
 • Type "change [requirement]" to modify anything
 • Type "explain" for more details about the implementation approach"""
+            else:
+                clar = validation.get("clarifications") or []
+                clar_block = "\n".join([f"- {c}" for c in clar]) if clar else "- Please clarify missing or vague details so I can proceed."
+                return f"""⚠️ Before I can proceed, I need a few clarifications to ensure this strategy is implementable with the current system:\n{clar_block}\n\nPlease answer these in one message."""
 
         # Check if LLM says READY
         if "STATUS: READY" in response:
             self._extract_requirements(response)
-            self.phase = "ready_to_implement"
-            return response + f"""
+            validation = self._validate_requirements_with_codebase()
+            self.last_validation = validation
+            if validation.get("implementable"):
+                self.phase = "ready_to_implement"
+                return response + f"""
 
 ✅ All requirements complete!
 
@@ -178,6 +190,10 @@ I'll create a Python backtesting strategy with these components:
 • Type "yes", "go", or "proceed" to start implementation
 • Type "change [requirement]" to modify anything
 • Type "explain" for more details about the implementation approach"""
+            else:
+                clar = validation.get("clarifications") or []
+                clar_block = "\n".join([f"- {c}" for c in clar]) if clar else "- Please clarify missing or vague details so I can proceed."
+                return f"""⚠️ Before I can proceed, I need a few clarifications to ensure this strategy is implementable with the current system:\n{clar_block}\n\nPlease answer these in one message."""
         
         return response
     
@@ -649,6 +665,115 @@ Write the COMPLETE corrected code:"""
             return {"success": False, "error": f"Syntax error: {e}"}
         except Exception as e:
             return {"success": False, "error": f"Code validation error: {e}"}
+
+    def _get_scaffold_context(self) -> str:
+        """Assemble minimal scaffold context for validator prompt."""
+        import os
+        base_dir = os.path.dirname(__file__)
+        parts = []
+        # sandbox.py (short, safe to include entirely)
+        try:
+            with open(os.path.join(base_dir, 'sandbox.py'), 'r', encoding='utf-8') as f:
+                parts.append("SANDBOX.PY:\n" + f.read())
+        except Exception:
+            pass
+        # reflection head and _test_code_components
+        try:
+            with open(os.path.join(base_dir, 'reflection.py'), 'r', encoding='utf-8') as f:
+                refl = f.read()
+            head = "\n".join(refl.splitlines()[:150])
+            parts.append("REFLECTION.PY (HEAD):\n" + head)
+            marker = "def _test_code_components"
+            idx = refl.find(marker)
+            if idx != -1:
+                snippet = refl[idx:]
+                parts.append("REFLECTION.PY (_test_code_components):\n" + "\n".join(snippet.splitlines()[:120]))
+        except Exception:
+            pass
+        return "\n\n".join(parts)
+
+    def _validate_requirements_with_codebase(self) -> dict:
+        """Use LLM to validate whether current requirements are implementable.
+
+        Returns: {"implementable": bool, "clarifications": list[str], "raw": str}
+        """
+        scaffold = self._get_scaffold_context()
+        req = self.requirements.copy()
+        prompt = (
+            "You are validating if the strategy is implementable using this scaffold.\n"
+            "Respond concisely with deterministic headers.\n\n"
+            "# VALIDATION RULES (code-like, hard constraints)\n"
+            "supports_single_ticker = True\n"
+            "supports_multi_asset = False\n"
+            "supports_options = False\n"
+            "requires_numeric_thresholds = True  # e.g. 'dips' must include % or window\n\n"
+            "# Heuristics (pseudo)\n"
+            "def contains_multiple_tickers(text):\n"
+            "    import re\n"
+            "    # two distinct tickers like 'GLD and SPY'\n"
+            "    return bool(re.search(r'\\b[A-Z]{2,5}\\b.*\\b[A-Z]{2,5}\\b', text)) and (' & ' in text or ' and ' in text or ',' in text)\n\n"
+            "def mentions_options(text):\n"
+            "    t = text.lower()\n"
+            "    return any(w in t for w in ['option', 'iron condor', 'straddle', 'strangle', 'call', 'put', 'spread'])\n\n"
+            "def vague_without_numbers(text):\n"
+            "    import re\n"
+            "    t = text.lower()\n"
+            "    vague_terms = ['dip', 'dips', 'momentum', 'breakout', 'retrace', 'bounce']\n"
+            "    has_vague = any(v in t for v in vague_terms)\n"
+            "    has_numbers = bool(re.search(r'\\d+\\s*%|\\d+\\s*(day|bar|period|window)', t))\n"
+            "    return has_vague and not has_numbers\n\n"
+            "def clearly_numeric_strategy(text):\n"
+            "    t = text.lower()\n"
+            "    # Examples: 'RSI < 30 and > 70', 'EMA 10 crosses 20', '5% drop'\n"
+            "    return any(k in t for k in ['rsi', 'ema', 'sma', '%'])\n\n"
+            f"REQUIREMENTS:\n{req}\n\n"
+            f"SCAFFOLD:\n{scaffold}\n\n"
+            "# DECISION LOGIC\n"
+            "# If multi-asset or options mentioned → IMPLEMENTABLE: NO\n"
+            "# If vague triggers without numeric thresholds → IMPLEMENTABLE: NO, but suggest concrete defaults\n"
+            "# If single ticker and rules are clearly numeric/precise → IMPLEMENTABLE: YES\n\n"
+            "Output exactly this format:\n"
+            "IMPLEMENTABLE: YES|NO\n"
+            "If NO, then follow with:\n"
+            "CLARIFICATIONS:\n"
+            "- Ask to choose a single ticker if multiple tickers are present\n"
+            "- Ask to avoid options/derivatives; propose stock-based alternative\n"
+            "- Ask for numeric thresholds/windows for vague terms (e.g., dips %)\n"
+            "- Provide one concrete suggestion when helpful (e.g., 'dip = 5% below 10-day EMA; sell on cross above')\n"
+            "- Up to 5 bullets total\n"
+        )
+        try:
+            resp = self.llm.ask(prompt)
+        except Exception as e:
+            return {"implementable": False, "clarifications": ["Please confirm ticker, period, capital, and concrete entry/exit rules."], "raw": str(e)}
+
+        text = resp.strip()
+        implementable = False
+        clarifications = []
+        for line in text.splitlines():
+            up = line.upper().strip()
+            if up.startswith("IMPLEMENTABLE:"):
+                if "YES" in up:
+                    implementable = True
+                break
+        if not implementable:
+            lines = text.splitlines()
+            start = False
+            for ln in lines:
+                if start:
+                    s = ln.strip()
+                    if not s:
+                        break
+                    if s.startswith(('-', '•', '*')) or (len(s) > 1 and s[0].isdigit()):
+                        clarifications.append(s.lstrip('-•* ').strip())
+                        if len(clarifications) >= 5:
+                            break
+                    else:
+                        break
+                elif ln.upper().startswith("CLARIFICATIONS:"):
+                    start = True
+
+        return {"implementable": implementable, "clarifications": clarifications, "raw": text}
     
     def _execute_backtest(self, code: str) -> dict:
         """Execute the backtest code."""
