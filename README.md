@@ -90,6 +90,10 @@ nlbt                    # Start interactive session
 - `debug` - Show internal state for troubleshooting  
 - `exit` - Quit
 
+### I'm feeling lucky (no setup)
+- Type `lucky` to run a built-in demo without any LLM calls.  
+  It runs a Buy & Hold AAPL (2024, $10,000) backtest and saves a report to `reports/lucky_YYYYMMDD_HHMMSS.md`.
+
 Reports are written to `reports/backtest_YYYYMMDD_HHMMSS.md`.
 
 ## Examples (realistic conversations)
