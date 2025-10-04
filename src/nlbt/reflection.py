@@ -349,6 +349,13 @@ class MyStrategy(Strategy):
 bt = Backtest(data, MyStrategy, cash=CASH_NUMBER)
 stats = bt.run()
 print(stats)
+# Print a small trades table (first 20) for report inclusion, if available
+try:
+    import pandas as pd
+    print("TRADES_TABLE")
+    print(stats._trades.head(20).to_markdown(index=False))
+except Exception:
+    pass
 ```
 
 PATTERN FOR INDICATORS (copy exactly):
@@ -409,7 +416,7 @@ YOUR TASK:
 2. Replace START_DATE, END_DATE based on: {self.requirements.get('period', '2024')}
    IMPORTANT: If using indicators with long windows (200-day SMA, etc.), START EARLIER to allow warmup.
    Example: For "2023-2024", use '2022-01-01' to '2024-12-31' to ensure 200-day SMA has data.
-3. Replace CASH_NUMBER with number from: {self.requirements.get('capital', '$10000')}
+3. Replace CASH_NUMBER with a pure number (e.g., 10000). If capital is given as text like '₹10,00,000' or '$10,000', convert to number.
 4. Implement strategy: {self.requirements.get('strategy', 'buy and hold')}
 5. Use indicator patterns above if needed
 
@@ -445,6 +452,8 @@ CRITICAL FIXES:
 3. Dates: '2024-01-01' format
 4. For indicators, use the helper function pattern shown earlier
 5. All indicators must return .to_numpy()
+6. At the end, print TRADES_CSV and EQUITY_CSV exactly as shown:
+   print("TRADES_CSV"); print(stats._trades.to_csv(index=False)); print("EQUITY_CSV"); print(stats._equity_curve.to_csv(index=False))
 
 Write the COMPLETE fixed code:"""
             
@@ -822,6 +831,65 @@ If results are shown and requirements met, say PROCEED."""
     
     def _phase3_reporting(self) -> str:
         """Phase 3: Plan, write, refine report."""
+        # Try to extract trades and equity from results output, if present
+        trades_csv = None
+        equity_csv = None
+        if isinstance(self.results, str):
+            text = self.results
+            if "TRADES_CSV" in text:
+                try:
+                    trades_csv = text.split("TRADES_CSV", 1)[1].strip()
+                    # Keep until next marker if present
+                    if "EQUITY_CSV" in trades_csv:
+                        trades_csv = trades_csv.split("EQUITY_CSV", 1)[0].strip()
+                except Exception:
+                    pass
+            if "EQUITY_CSV" in text:
+                try:
+                    equity_csv = text.split("EQUITY_CSV", 1)[1].strip()
+                except Exception:
+                    pass
+
+        # Save assets folder
+        import os
+        from datetime import datetime
+        os.makedirs("reports", exist_ok=True)
+        ticker_slug = (self.requirements.get('ticker') or 'TICKER').replace('^','').replace('.','_')
+        period_slug = (self.requirements.get('period') or 'PERIOD').replace(' ','').replace(':','-')
+        run_dir = f"reports/{ticker_slug}_{period_slug}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        os.makedirs(run_dir, exist_ok=True)
+
+        # Try generating charts using matplotlib if equity CSV exists
+        equity_png = None
+        trades_table_md = None
+        try:
+            import pandas as pd  # type: ignore
+            import matplotlib.pyplot as plt  # type: ignore
+            if equity_csv:
+                from io import StringIO
+                eq_df = pd.read_csv(StringIO(equity_csv))
+                # Guess equity column name
+                ycol = 'Equity' if 'Equity' in eq_df.columns else eq_df.columns[-1]
+                x = eq_df.index if 'index' in eq_df.columns else range(len(eq_df))
+                plt.figure(figsize=(8,4))
+                plt.plot(eq_df[ycol])
+                plt.title('Equity Curve')
+                plt.grid(True, alpha=0.3)
+                equity_png = os.path.join(run_dir, 'equity.png')
+                plt.tight_layout()
+                plt.savefig(equity_png, dpi=150)
+                plt.close()
+            if trades_csv:
+                from io import StringIO
+                tr_df = pd.read_csv(StringIO(trades_csv))
+                # Build a compact markdown table of first 20 trades
+                cols = [c for c in tr_df.columns][:6]
+                head = tr_df[cols].head(20)
+                trades_table_md = "| " + " | ".join(cols) + " |\n" + "|" + "---|"*len(cols) + "\n"
+                for _, row in head.iterrows():
+                    trades_table_md += "| " + " | ".join(str(row[c]) for c in cols) + " |\n"
+        except Exception:
+            pass
         # Plan
         plan_prompt = f"""Plan a backtest report structure:
 
@@ -856,18 +924,61 @@ Write in markdown format:"""
 
         draft = self.llm.ask(write_prompt)
         
-        # Save
-        import os
-        from datetime import datetime
-        os.makedirs("reports", exist_ok=True)
-        filename = f"reports/backtest_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
-        with open(filename, "w") as f:
-            f.write(draft)
+        # Localize summary header if requested
+        lang = (self.requirements.get('lang') or 'en').lower()
+        if lang.startswith('hi'):
+            summary_title = 'सारांश'
+        elif lang.startswith('gu'):
+            summary_title = 'સારાંશ'
+        else:
+            summary_title = 'Summary'
+
+        # Inject TL;DR and trades/equity references
+        final_md = f"# {summary_title}\n\n" + draft
+        if trades_table_md:
+            final_md += "\n\n## Trades (first 20)\n\n" + trades_table_md
+        if equity_png:
+            final_md += f"\n\n## Equity Curve\n\n![]({os.path.basename(equity_png)})\n"
+
+        # Save markdown and assets into run directory
+        md_path = os.path.join(run_dir, 'report.md')
+        with open(md_path, 'w') as f:
+            f.write(final_md)
+
+        # Try saving a simple PDF with matplotlib PdfPages (equity chart + text page)
+        try:
+            import matplotlib.pyplot as plt  # type: ignore
+            from matplotlib.backends.backend_pdf import PdfPages  # type: ignore
+            pdf_path = os.path.join(run_dir, 'report.pdf')
+            with PdfPages(pdf_path) as pdf:
+                # Page 1: Title
+                plt.figure(figsize=(8.27, 11.69))
+                plt.axis('off')
+                plt.text(0.5, 0.9, 'NLBT Backtest Report', ha='center', va='center', fontsize=18)
+                plt.text(0.1, 0.8, self._format_requirements(), ha='left', va='top', fontsize=10, family='monospace')
+                pdf.savefig(); plt.close()
+                # Page 2: Equity
+                if equity_png:
+                    img = plt.imread(equity_png)
+                    plt.figure(figsize=(8.27, 11.69))
+                    plt.axis('off')
+                    plt.imshow(img)
+                    pdf.savefig(); plt.close()
+                # Page 3: Trades (text block)
+                if trades_table_md:
+                    plt.figure(figsize=(8.27, 11.69))
+                    plt.axis('off')
+                    plt.text(0.05, 0.95, 'Trades (first 20)', ha='left', va='top', fontsize=12)
+                    plt.text(0.05, 0.9, trades_table_md, ha='left', va='top', fontsize=7, family='monospace')
+                    pdf.savefig(); plt.close()
+        except Exception:
+            pass
         
         self.phase = "complete"
         return f"""🎉 COMPLETE! All 3 phases finished successfully.
 
-📄 PROFESSIONAL REPORT SAVED: {filename}
+📄 REPORT FOLDER: {run_dir}
+• Markdown: {md_path}
 
 📈 WHAT YOU GOT:
 • Complete backtest analysis with performance metrics
@@ -876,7 +987,7 @@ Write in markdown format:"""
 • Professional markdown report ready to share
 
 💡 NEXT STEPS:
-• Check the report: {filename}
+• Check the report: {md_path}
 • Try another strategy with different parameters
 • Ask me to explain any results you don't understand
 
@@ -925,7 +1036,7 @@ Write in markdown format:"""
             if self.requirements.get("ticker"):
                 break
 
-        # Also check for company names and map to tickers
+        # Also check for company names and map to tickers (incl. India aliases)
         company_to_ticker = {
             "amazon": "AMZN",
             "apple": "AAPL",
@@ -936,7 +1047,15 @@ Write in markdown format:"""
             "meta": "META",
             "netflix": "NFLX",
             "spy": "SPY",
-            "qqq": "QQQ"
+            "qqq": "QQQ",
+            # India
+            "reliance": "RELIANCE.NS",
+            "tcs": "TCS.NS",
+            "hdfcbank": "HDFCBANK.NS",
+            "icicibank": "ICICIBANK.NS",
+            "infosys": "INFY.NS",
+            "nifty": "^NSEI",
+            "banknifty": "^NSEBANK"
         }
 
         for company, ticker in company_to_ticker.items():
@@ -954,10 +1073,23 @@ Write in markdown format:"""
             if period_match:
                 self.requirements["period"] = period_match.group(1)
         
-        # Extract capital amounts
-        capital_match = re.search(r'\$([0-9,]+(?:K|k)?)', user_input)
-        if capital_match and not self.requirements.get("capital"):
-            self.requirements["capital"] = f"${capital_match.group(1)}"
+        # Extract capital amounts: support $ and ₹ / INR and Indian commas
+        if not self.requirements.get("capital"):
+            import re as _re
+            cap_num = None
+            m_usd = _re.search(r'\$\s*([0-9,]+(?:K|k)?)', user_input)
+            m_inr = _re.search(r'(?:₹|INR)\s*([0-9,]+)', user_input, _re.IGNORECASE)
+            if m_usd:
+                cap = m_usd.group(1).replace(',', '')
+                if cap.lower().endswith('k'):
+                    cap_num = int(float(cap[:-1]) * 1000)
+                else:
+                    cap_num = int(cap)
+                self.requirements["capital"] = f"${cap_num}"
+            elif m_inr:
+                cap = m_inr.group(1).replace(',', '')
+                cap_num = int(cap)
+                self.requirements["capital"] = f"₹{cap_num}"
         
         # Extract strategy - look for complete trading descriptions
         strategy_patterns = [

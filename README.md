@@ -96,6 +96,15 @@ nlbt                    # Start interactive session
 
 Reports are written to `reports/backtest_YYYYMMDD_HHMMSS.md`.
 
+### India-friendly input
+- Tickers: common aliases map to Yahoo Finance symbols (e.g., `reliance` → `RELIANCE.NS`, `tcs` → `TCS.NS`, `nifty` → `^NSEI`).
+- Capital: accepts rupees (`₹10,00,000`, `INR 500000`) and dollars (`$10,000`).
+- Language: set summary language via `lang hi`, `lang gu`, or `lang en` (default `en`).
+
+### Reports output
+- Each run saves under `reports/<TICKER>_<PERIOD>_<TIMESTAMP>/report.md`.
+- If trades are present, the report includes a small `Trades` table (first 20 rows).
+
 ## Examples (realistic conversations)
 
 **Simple Buy & Hold**

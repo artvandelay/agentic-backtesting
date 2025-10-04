@@ -16,6 +16,7 @@ dependencies = [
     "llm",
     "python-dotenv",
     "rich",
+    "matplotlib",
 ]
 
 [project.scripts]
