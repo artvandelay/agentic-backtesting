@@ -2,37 +2,37 @@
 
 import sys
 from .reflection import ReflectionEngine
+from rich.console import Console
+from rich.panel import Panel
 
 
 def main():
     """Run the backtesting assistant."""
     model = sys.argv[1] if len(sys.argv) > 1 else None
     engine = ReflectionEngine(model)
-    
-    print("🧠 Backtesting Assistant (WIP)")
-    print(f"Chat model: {engine.llm.model}")
-    print(f"Code model: {engine.code_llm.model} (strong model for implementation)")
-    print()
-    print("📋 How it works:")
-    print("  Phase 1 (🔍 Understanding): I'll ask questions until I have complete info")
-    print("  Phase 2 (⚙️ Implementation): I'll generate, test, and refine code")
-    print("  Phase 3 (📊 Reporting): I'll create a professional analysis report")
-    print()
-    print("⚠️  Current limitations:")
-    print("  • Single ticker strategies work best (multi-asset may fail)")
-    print("  • Uses Yahoo Finance data (US stocks, ETFs, crypto with -USD suffix)")
-    print("  • Max 3 code generation attempts per strategy")
-    print("  • Requires LLM API access and credits")
-    print("  • Generated code runs locally (trusted environment only)")
-    print()
-    print("💬 You can:")
-    print("  • Describe your strategy in plain English (try: 'Buy SPY when RSI < 30')")
-    print("  • Make changes anytime by saying 'actually...' or 'change...'")
-    print("  • Type 'info' to see current phase and requirements")
-    print("  • Type 'debug' if something goes wrong")
-    print("  • Type 'exit' to quit")
-    print()
-    print("🚀 Ready! Describe your single-ticker trading strategy...")
+    console = Console()
+    header = (
+        f"[bold cyan]🧠 Backtesting Assistant (WIP)[/bold cyan]\n"
+        f"[dim]Chat model:[/dim] {engine.llm.model}\n"
+        f"[dim]Code model:[/dim] {engine.code_llm.model} (strong model for implementation)\n\n"
+        "[bold]📋 How it works:[/bold]\n"
+        "  • Phase 1 (🔍 Understanding): Ask until info is complete\n"
+        "  • Phase 2 (⚙️ Implementation): Generate, test, refine code\n"
+        "  • Phase 3 (📊 Reporting): Produce a professional report\n\n"
+        "[bold]⚠️ Current limitations:[/bold]\n"
+        "  • Single ticker strategies work best (multi-asset may fail)\n"
+        "  • Uses Yahoo Finance data (US stocks, ETFs, crypto with -USD suffix)\n"
+        "  • Max 3 code generation attempts per strategy\n"
+        "  • Requires LLM API access and credits\n"
+        "  • Generated code runs locally (trusted environment only)\n\n"
+        "[bold]💬 You can:[/bold]\n"
+        "  • Describe your strategy (e.g. 'Buy SPY when RSI < 30')\n"
+        "  • Type 'info' for current phase and requirements\n"
+        "  • Type 'debug' for internal state\n"
+        "  • Type 'exit' to quit\n\n"
+        "🚀 Ready! Describe your single-ticker trading strategy..."
+    )
+    console.print(Panel.fit(header, title="NLBT", border_style="cyan"))
     
     while True:
         try:
@@ -98,24 +98,24 @@ def main():
                 continue
             
             if user_input.lower() == "debug":
-                print(f"\n🐛 Debug Info:")
-                print(f"Phase: {engine.phase}")
-                print(f"History length: {len(engine.history)}")
+                console.print("\n[bold]🐛 Debug Info:[/bold]")
+                console.print(f"Phase: {engine.phase}")
+                console.print(f"History length: {len(engine.history)}")
                 if engine.history:
-                    print(f"Last 3 history items:")
+                    console.print("Last 3 history items:")
                     for item in engine.history[-3:]:
-                        print(f"  {item}")
+                        console.print(f"  {item}")
                 if engine.requirements:
-                    print(f"Requirements: {engine.requirements}")
+                    console.print(f"Requirements: {engine.requirements}")
                 if engine.code:
-                    print(f"\n📝 Last Code Generated:\n{engine.code[:500]}...")
+                    console.print(f"\n📝 Last Code Generated:\n{engine.code[:500]}...")
                 if engine.last_error:
-                    print(f"\n❌ Last Error:\n{engine.last_error}")
+                    console.print(f"\n❌ Last Error:\n{engine.last_error}")
                 if engine.results:
-                    print(f"\n✅ Last Results:\n{engine.results[:300]}...")
+                    console.print(f"\n✅ Last Results:\n{engine.results[:300]}...")
                 if getattr(engine, 'last_validation', None) is not None:
-                    print(f"\n🔎 Last Validation:\n{engine.last_validation}")
-                print()
+                    console.print(f"\n🔎 Last Validation:\n{engine.last_validation}")
+                console.print()
                 continue
             
             # Process
@@ -127,13 +127,9 @@ def main():
                 "complete": "✅"
             }
             
-            print(f"\n{phase_emoji.get(engine.phase, '🤔')} Processing...", end="\r")
-            sys.stdout.flush()
-            
-            response = engine.chat(user_input)
-
-            print(" " * 60, end="\r")  # Clear processing line
-            print(f"\n🤖 {response}\n")
+            with Console().status(f"{phase_emoji.get(engine.phase, '🤔')} Processing...", spinner="dots"):
+                response = engine.chat(user_input)
+            Console().print(f"\n🤖 {response}\n")
 
             # Check if conversation is complete and handle accordingly
             if engine.phase == "complete":

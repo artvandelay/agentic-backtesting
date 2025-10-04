@@ -15,6 +15,7 @@ dependencies = [
     "ta",
     "llm",
     "python-dotenv",
+    "rich",
 ]
 
 [project.scripts]
