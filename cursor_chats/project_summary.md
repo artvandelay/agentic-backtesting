@@ -1,5 +1,13 @@
 # NLBT Project Summary
 
+## What's new (2025-10)
+
+- Lucky demo: quick, no-LLM built-in run with saved report
+- India-friendly inputs: NSE aliases and rupee parsing (₹/INR)
+- Localized TL;DR: Hindi/Gujarati/English summary via `lang` flag
+- Descriptive report folders: `reports/<TICKER>_<PERIOD>_<TIMESTAMP>/report.md`
+- Trades table: LLM includes a compact markdown table when available
+
 ## ✅ Implementation Complete
 
 The agentic natural language backtesting sandbox has been successfully implemented according to the specification. Here's what was built:

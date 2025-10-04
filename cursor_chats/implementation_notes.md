@@ -144,3 +144,11 @@ def new_helper():
 - Monte Carlo analysis
 - Risk management tools
 - Custom indicator library
+
+## Recent UX improvements (2025-10)
+
+- Lucky demo: `lucky` command runs a built-in Buy & Hold AAPL (2024, $10k) demo without any LLM calls; saves a report.
+- India-friendly input: Aliases for common NSE/indices (e.g., `reliance` → `RELIANCE.NS`, `nifty` → `^NSEI`) and rupee parsing (`₹10,00,000`, `INR 500000`).
+- Localized summary: `lang hi|gu|en` selects the language for the TL;DR summary (rest of report remains English for now).
+- Report folders: Each run saves to `reports/<TICKER>_<PERIOD>_<TIMESTAMP>/report.md`.
+- Trades table: If available, Phase 2 code prints a compact markdown table (first 20 trades) under the `TRADES_TABLE` marker; Phase 3 includes it verbatim in the report.
