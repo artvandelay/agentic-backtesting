@@ -96,7 +96,7 @@ class ReflectionEngine:
         self.history.append(f"Agent: {response}")
         return response
     
-    def _phase1_understanding(self, user_input: str) -> str:
+    def _phase1_understanding(self, user_input: str, from_confirmation: bool = False) -> str:
         """Phase 1: Gather requirements until LLM says READY."""
         
         # First, try to extract requirements from the conversation
@@ -158,7 +158,8 @@ RESPOND ONLY to the current user message. Do NOT create fake conversations."""
         has_strategy = bool(self.requirements.get('strategy'))
 
         # If we have all requirements, validate against scaffold before READY
-        if has_ticker and has_period and has_capital and has_strategy:
+        # BUT skip auto-proceed if we're coming from confirmation step
+        if has_ticker and has_period and has_capital and has_strategy and not from_confirmation:
             validation = self._validate_requirements_with_codebase()
             self.last_validation = validation
             if validation.get("implementable"):
@@ -219,116 +220,43 @@ RESPOND ONLY to the current user message. Do NOT create fake conversations."""
         """Handle user confirmation before starting implementation."""
         user_lower = user_input.lower().strip()
         
-        # Check for proceed signals
-        if any(word in user_lower for word in ["yes", "go", "proceed", "ok", "start", "continue"]):
+        # Check for proceed signals (whole word matching)
+        import re
+        proceed_words = ["yes", "go", "proceed", "ok", "start", "continue"]
+        proceed_pattern = r'\b(' + '|'.join(proceed_words) + r')\b'
+        
+        # Check for conflicting words that indicate it's not a simple proceed
+        conflict_words = ["but", "change", "explain", "first", "wait", "think", "over", "else"]
+        has_conflict = any(word in user_lower for word in conflict_words)
+        
+        if re.search(proceed_pattern, user_lower) and not has_conflict:
+            # Proceed if we have a proceed word AND no conflicting words
             self.phase = "implementation"
             
             # Immediately start implementation instead of just showing a message
             implementation_result = self._phase2_implementation()
             return implementation_result
         
-        # Check for change requests (including 'sorry')
-        if any(word in user_lower for word in ["change", "modify", "update", "actually", "sorry"]):
-            self.phase = "understanding"
-            
-            # Track old values for smart substitution
-            old_ticker = self.requirements.get("ticker")
-            old_capital = self.requirements.get("capital")
-            
-            # CRITICAL FIX: Clear requirements that user wants to change
-            # Look for what they're changing
-            if "period" in user_lower or "date" in user_lower or any(year in user_input for year in ["2010", "2011", "2012", "2013", "2014", "2015", "2016", "2017", "2018", "2019", "2020", "2021", "2022", "2023", "2024"]):
-                self.requirements.pop("period", None)
-            
-            if "ticker" in user_lower or "stock" in user_lower or any(ticker in user_input.upper() for ticker in ["AAPL", "MSFT", "GOOGL", "TSLA", "NVDA", "SPY", "QQQ", "AMZN", "META"]):
-                self.requirements.pop("ticker", None)
-            
-            if "capital" in user_lower or "$" in user_input or "money" in user_lower:
-                self.requirements.pop("capital", None)
-            
-            if "strategy" in user_lower:
-                self.requirements.pop("strategy", None)
-            
-            # Re-extract from new input
-            self._update_requirements_from_conversation(user_input)
-            
-            # SMART SUBSTITUTION: Update strategy text if ticker or capital changed
-            if "strategy" in self.requirements:
-                strategy = self.requirements["strategy"]
-                
-                # If ticker changed, replace old ticker with new ticker in strategy
-                new_ticker = self.requirements.get("ticker")
-                if old_ticker and new_ticker and old_ticker != new_ticker and old_ticker in strategy:
-                    self.requirements["strategy"] = strategy.replace(old_ticker, new_ticker)
-                
-                # If capital changed, replace old capital with new capital in strategy
-                new_capital = self.requirements.get("capital")
-                if old_capital and new_capital and old_capital != new_capital and old_capital in strategy:
-                    self.requirements["strategy"] = strategy.replace(old_capital, new_capital)
-            
-            return "Got it! Let me update that for you.\n\n" + self._phase1_understanding(user_input)
-        
-        # Check for explanation request
-        if "explain" in user_lower:
-            return f"""📝 DETAILED IMPLEMENTATION APPROACH:
-
-🎯 STRATEGY BREAKDOWN:
-{self.requirements.get('strategy', 'Your trading strategy')}
-
-🔧 TECHNICAL IMPLEMENTATION:
-1. **Data Setup**: Fetch OHLCV data for {self.requirements.get('ticker', 'ticker')} using yfinance
-2. **Indicators**: Calculate RSI, daily returns, and any other required indicators
-3. **Entry Logic**: Implement buy conditions (price drops + RSI threshold)
-4. **Exit Logic**: Implement sell conditions (profit target, time limit, stop loss)
-5. **Position Sizing**: Use {self.requirements.get('capital', 'specified capital')} for position calculation
-6. **Backtesting**: Run simulation using backtesting.py library
-7. **Analysis**: Generate performance metrics and statistics
-
-💻 CODE STRUCTURE:
-- Custom Strategy class inheriting from backtesting.Strategy
-- init() method for indicator setup
-- next() method for trading logic implementation
-- Proper risk management and position sizing
-
-🤔 Ready to proceed with this approach?
-• Type "yes" or "go" to start implementation
-• Type "change [aspect]" to modify requirements"""
-        
-        # Handle "no" explicitly
-        if user_lower == "no":
-            return f"""I understand you're not ready to proceed yet. 
-
-📋 CURRENT PLAN:
-• Ticker: {self.requirements.get('ticker', '?')}
-• Period: {self.requirements.get('period', '?')}
-• Capital: {self.requirements.get('capital', '?')}
-• Strategy: {self.requirements.get('strategy', '?')}
-
-What would you like to do?
-• "change [requirement]" → Modify something (e.g., "change period to 2020-2023")
-• "explain" → See more details about the implementation
-• Or just tell me what's wrong and I'll help!"""
-        
-        # Default response for unclear input
-        return f"""🤔 I need your confirmation to proceed.
-
-📋 CURRENT PLAN:
-• Ticker: {self.requirements.get('ticker', '?')}
-• Period: {self.requirements.get('period', '?')}
-• Capital: {self.requirements.get('capital', '?')}
-• Strategy: {self.requirements.get('strategy', '?')}
-
-Please choose:
-• "yes" or "go" → Start implementation
-• "change [requirement]" → Modify something
-• "explain" → More details about implementation approach"""
+        # Everything else goes back to understanding phase
+        # The understanding phase LLM is smart enough to handle:
+        # - "change ticker to TSLA" 
+        # - "explain how RSI works"
+        # - "actually use 2023 instead"
+        # - "reset everything"
+        # - "what does this strategy do?"
+        self.phase = "understanding"
+        return "Got it! Let me help you with that.\n\n" + self._phase1_understanding(user_input, from_confirmation=True)
     
     def _phase2_implementation(self, attempt: int = 1) -> str:
         """Phase 2: Producer generates, Critic evaluates."""
         if attempt > 3:
             if self.debug_logger:
                 self.debug_logger.info(f"Failed after 3 attempts. Last error: {self.last_error}")
-            return f"❌ Failed after 3 attempts.\n\nLast error:\n{self.last_error}"
+            
+            # Return to understanding phase with full context
+            self.phase = "understanding"
+            error_msg = f"❌ Failed after 3 attempts.\n\nLast error:\n{self.last_error}\n\nLet's try a different approach."
+            return error_msg + "\n\n" + self._phase1_understanding("I need help fixing this strategy", from_confirmation=True)
         
         print(f"🔄 Attempt {attempt}/3 - Generating/Testing/Executing...")
         if self.debug_logger:
