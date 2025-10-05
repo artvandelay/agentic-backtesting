@@ -2,7 +2,6 @@
 
 import sys
 from .reflection import ReflectionEngine
-from .sandbox import Sandbox
 from datetime import datetime
 import os
 from rich.console import Console
@@ -58,37 +57,12 @@ def main():
                 break
             
             if user_input.lower() in ["lucky", "i'm feeling lucky", "feeling lucky", "demo"]:
-                # Run a built-in example without any LLM calls
-                console.print("\n[bold]🎲 I'm feeling lucky: Running a built-in demo (Buy & Hold AAPL 2024, $10,000)...[/bold]")
-                code = (
-                    "from backtesting import Backtest, Strategy\n"
-                    "data = get_ohlcv_data('AAPL', '2024-01-01', '2024-12-31')\n"
-                    "class MyStrategy(Strategy):\n"
-                    "    def init(self):\n"
-                    "        pass\n"
-                    "    def next(self):\n"
-                    "        if not self.position:\n"
-                    "            self.buy()\n"
-                    "bt = Backtest(data, MyStrategy, cash=10000)\n"
-                    "stats = bt.run()\n"
-                    "print(stats)\n"
-                )
-                result = Sandbox().run(code)
-                # Save a minimal report
-                os.makedirs("reports", exist_ok=True)
-                report_path = f"reports/lucky_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
-                with open(report_path, "w") as f:
-                    f.write("# NLBT — Lucky Demo\n\n")
-                    f.write("Demo: Buy & Hold AAPL in 2024 with $10,000\n\n")
-                    f.write("## Results\n\n")
-                    f.write("````\n")
-                    f.write((result.get("output") or "").strip())
-                    f.write("\n````\n\n")
-                    f.write("## Code\n\n")
-                    f.write("```python\n")
-                    f.write(code)
-                    f.write("```\n")
-                console.print(f"\n✅ Saved demo report to: [green]{report_path}[/green]\n")
+                # Submit a default NL prompt through the same agent path; no auto-proceed
+                console.print("\n[bold]🎲 I'm feeling lucky[/bold] — using: [dim]Buy and hold AAPL in 2024 with $10,000[/dim]")
+                default_prompt = "Buy and hold AAPL in 2024 with $10,000"
+                with Console().status("Processing...", spinner="dots"):
+                    resp = engine.chat(default_prompt)
+                Console().print(f"\n🤖 {resp}\n")
                 continue
             
             if user_input.lower() == "info":

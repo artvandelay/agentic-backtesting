@@ -1,8 +1,26 @@
 """Minimal 3-phase reflection engine."""
 
 import os
+import logging
+import glob
+from datetime import datetime
 from .llm import LLM
 from .sandbox import Sandbox
+
+
+def setup_run_logging(run_dir):
+    """Setup debug and agent loggers for this run."""
+    # Developer trace logger
+    debug = logging.getLogger(f'debug_{run_dir}')
+    debug.setLevel(logging.INFO)
+    debug.addHandler(logging.FileHandler(f'{run_dir}/debug.log'))
+    
+    # Agent context logger
+    agent = logging.getLogger(f'agent_{run_dir}')
+    agent.setLevel(logging.INFO)
+    agent.addHandler(logging.FileHandler(f'{run_dir}/agent.log'))
+    
+    return debug, agent
 
 
 class ReflectionEngine:
@@ -37,6 +55,9 @@ class ReflectionEngine:
         self.last_error = ""
         # Last validator decision for debugging
         self.last_validation = None
+        # Loggers (initialized in phase 3 when run_dir is created)
+        self.debug_logger = None
+        self.agent_logger = None
     
     def chat(self, user_input: str) -> str:
         """Process user message, return agent response."""
@@ -141,30 +162,26 @@ RESPOND ONLY to the current user message. Do NOT create fake conversations."""
             validation = self._validate_requirements_with_codebase()
             self.last_validation = validation
             if validation.get("implementable"):
-                self.phase = "ready_to_implement"
-                return f"""STATUS: READY
-TICKER: {self.requirements['ticker']}
-PERIOD: {self.requirements['period']}
-CAPITAL: {self.requirements['capital']}
-STRATEGY: {self.requirements['strategy']}
-
-I have everything needed to proceed with the backtest.
-
-✅ All requirements complete!
-
-📋 IMPLEMENTATION PLAN:
-I'll create a Python backtesting strategy with these components:
-• Data fetching for {self.requirements['ticker']} in {self.requirements['period']}
-• Strategy class implementing: {self.requirements['strategy']}
-• Backtest execution with {self.requirements['capital']}
-• Performance analysis and results
-
-🤔 READY TO PROCEED?
-• Type "yes", "go", or "proceed" to start implementation
-• Type "change [requirement]" to modify anything
-• Type "explain" for more details about the implementation approach"""
+                # Auto-proceed immediately (agentic flow)
+                self.phase = "implementation"
+                return self._phase2_implementation()
             else:
                 clar = validation.get("clarifications") or []
+                # Synthesize concrete clarifications if missing
+                if not clar:
+                    missing = []
+                    for k in ["ticker", "period", "capital", "strategy"]:
+                        if not self.requirements.get(k):
+                            missing.append(k)
+                    for k in missing:
+                        if k == "ticker":
+                            clar.append("Specify a single ticker (e.g., AAPL or RELIANCE.NS)")
+                        elif k == "period":
+                            clar.append("Provide a concrete period (e.g., 2023 or 2020-2024)")
+                        elif k == "capital":
+                            clar.append("Provide initial capital with currency (e.g., $10,000 or ₹10,00,000)")
+                        elif k == "strategy":
+                            clar.append("Describe entry and exit rules with numeric thresholds")
                 clar_block = "\n".join([f"- {c}" for c in clar]) if clar else "- Please clarify missing or vague details so I can proceed."
                 return f"""⚠️ Before I can proceed, I need a few clarifications to ensure this strategy is implementable with the current system:\n{clar_block}\n\nPlease answer these in one message."""
 
@@ -174,24 +191,25 @@ I'll create a Python backtesting strategy with these components:
             validation = self._validate_requirements_with_codebase()
             self.last_validation = validation
             if validation.get("implementable"):
-                self.phase = "ready_to_implement"
-                return response + f"""
-
-✅ All requirements complete!
-
-📋 IMPLEMENTATION PLAN:
-I'll create a Python backtesting strategy with these components:
-• Data fetching for {self.requirements.get('ticker', 'the stock')} in {self.requirements.get('period', 'the specified period')}
-• Strategy class implementing: {self.requirements.get('strategy', 'your trading rules')}
-• Backtest execution with {self.requirements.get('capital', 'your capital')}
-• Performance analysis and results
-
-🤔 READY TO PROCEED?
-• Type "yes", "go", or "proceed" to start implementation
-• Type "change [requirement]" to modify anything
-• Type "explain" for more details about the implementation approach"""
+                # Auto-proceed directly
+                self.phase = "implementation"
+                return self._phase2_implementation()
             else:
                 clar = validation.get("clarifications") or []
+                if not clar:
+                    missing = []
+                    for k in ["ticker", "period", "capital", "strategy"]:
+                        if not self.requirements.get(k):
+                            missing.append(k)
+                    for k in missing:
+                        if k == "ticker":
+                            clar.append("Specify a single ticker (e.g., AAPL or RELIANCE.NS)")
+                        elif k == "period":
+                            clar.append("Provide a concrete period (e.g., 2023 or 2020-2024)")
+                        elif k == "capital":
+                            clar.append("Provide initial capital with currency (e.g., $10,000 or ₹10,00,000)")
+                        elif k == "strategy":
+                            clar.append("Describe entry and exit rules with numeric thresholds")
                 clar_block = "\n".join([f"- {c}" for c in clar]) if clar else "- Please clarify missing or vague details so I can proceed."
                 return f"""⚠️ Before I can proceed, I need a few clarifications to ensure this strategy is implementable with the current system:\n{clar_block}\n\nPlease answer these in one message."""
         
@@ -308,9 +326,13 @@ Please choose:
     def _phase2_implementation(self, attempt: int = 1) -> str:
         """Phase 2: Producer generates, Critic evaluates."""
         if attempt > 3:
+            if self.debug_logger:
+                self.debug_logger.info(f"Failed after 3 attempts. Last error: {self.last_error}")
             return f"❌ Failed after 3 attempts.\n\nLast error:\n{self.last_error}"
         
         print(f"🔄 Attempt {attempt}/3 - Generating/Testing/Executing...")
+        if self.debug_logger:
+            self.debug_logger.info(f"Attempt {attempt}/3 - Generating/Testing/Executing...")
         
         # Producer: Generate code with BULLETPROOF template
         if attempt == 1:
@@ -349,11 +371,40 @@ class MyStrategy(Strategy):
 bt = Backtest(data, MyStrategy, cash=CASH_NUMBER)
 stats = bt.run()
 print(stats)
-# Print a small trades table (first 20) for report inclusion, if available
+
+# Emit structured artifacts for reporting
+import json
 try:
+    # Trades preview table
     import pandas as pd
     print("TRADES_TABLE")
     print(stats._trades.head(20).to_markdown(index=False))
+except Exception:
+    pass
+
+# Full CSVs for optional charts/tables
+try:
+    import pandas as pd
+    print("TRADES_CSV"); print(stats._trades.to_csv(index=False))
+    print("EQUITY_CSV"); print(stats._equity_curve.to_csv(index=False))
+except Exception:
+    pass
+
+# Compact summary for TL;DR
+try:
+    end_date = str(stats.get('End', '')) or (str(data.index[-1].date()) if hasattr(data, 'index') and len(data.index) else '')
+    equity_final = float(stats.get('Equity Final [$]', 0))
+    initial_cap = float(CASH_NUMBER)
+    pnl_abs = equity_final - initial_cap
+    pnl_pct = float(stats.get('Return [%]', 0))
+    print("SUMMARY_JSON"); print(json.dumps(dict(
+        end=end_date,
+        initial=initial_cap,
+        equity_final=equity_final,
+        portfolio_final=equity_final,
+        pnl_abs=pnl_abs,
+        pnl_pct=pnl_pct
+    )))
 except Exception:
     pass
 ```
@@ -431,6 +482,13 @@ Write ONLY the complete code (no markdown, no explanations):"""
         # Execute
         result = self.sandbox.run(self.code)
         
+        if self.debug_logger:
+            self.debug_logger.info(f"Execution result: {'SUCCESS' if result['success'] else 'FAILED'}")
+            if result["success"]:
+                self.debug_logger.info(f"Output:\n{result['output']}")
+            else:
+                self.debug_logger.info(f"Error:\n{result['error']}")
+        
         if not result["success"]:
             self.last_error = result["error"]
             
@@ -488,14 +546,22 @@ DECISION: [PROCEED or RETRY]"""
 
         critique = self.code_llm.ask(critique_prompt)
         
+        if self.debug_logger:
+            self.debug_logger.info(f"Critic decision: {'PROCEED' if 'PROCEED' in critique.upper() else 'RETRY'}")
+        
         if "PROCEED" in critique.upper():
             self.phase = "reporting"
-            return f"""✅ Implementation successful!
-
-📊 BACKTEST RESULTS:
-{self.results}
-
-{self._phase3_reporting()}"""
+            # Lightweight LLM TL;DR from stats
+            summary_line = self._llm_tldr(self.results)
+            # Generate report but keep CLI output minimal
+            report_msg = self._phase3_reporting()
+            # Extract folder path line for concise echo
+            folder_line = ""
+            for ln in report_msg.splitlines():
+                if ln.startswith("📄 REPORT FOLDER:"):
+                    folder_line = ln
+                    break
+            return f"🧾 {summary_line}\n{folder_line}"
         else:
             return self._phase2_implementation(attempt + 1)
     
@@ -831,11 +897,17 @@ If results are shown and requirements met, say PROCEED."""
     
     def _phase3_reporting(self) -> str:
         """Phase 3: Plan, write, refine report."""
-        # Try to extract trades and equity from results output, if present
+        # Try to extract structured outputs from results
         trades_csv = None
         equity_csv = None
+        summary_json = None
         if isinstance(self.results, str):
             text = self.results
+            if "SUMMARY_JSON" in text:
+                try:
+                    summary_json = text.split("SUMMARY_JSON", 1)[1].strip().splitlines()[0]
+                except Exception:
+                    pass
             if "TRADES_CSV" in text:
                 try:
                     trades_csv = text.split("TRADES_CSV", 1)[1].strip()
@@ -858,6 +930,9 @@ If results are shown and requirements met, say PROCEED."""
         period_slug = (self.requirements.get('period') or 'PERIOD').replace(' ','').replace(':','-')
         run_dir = f"reports/{ticker_slug}_{period_slug}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         os.makedirs(run_dir, exist_ok=True)
+        
+        # Setup logging for this run
+        self.debug_logger, self.agent_logger = setup_run_logging(run_dir)
 
         # Try generating charts using matplotlib if equity CSV exists
         equity_png = None
@@ -933,8 +1008,22 @@ Write in markdown format:"""
         else:
             summary_title = 'Summary'
 
-        # Inject TL;DR and trades/equity references
-        final_md = f"# {summary_title}\n\n" + draft
+        # Compute TL;DR via LLM and inject at top of report; if summary_json exists, prioritize its fields
+        if summary_json:
+            try:
+                import json as _json
+                sj = _json.loads(summary_json)
+                tldr_line = (
+                    f"Strategy: {sj.get('strategy','')} · End: {sj.get('end','')} "
+                    f"· Initial: {sj.get('initial','')} "
+                    f"· Equity: {sj.get('equity_final','')} "
+                    f"· Portfolio: {sj.get('portfolio_final','')}"
+                )
+            except Exception:
+                tldr_line = self._llm_tldr(self.results if isinstance(self.results, str) else str(self.results))
+        else:
+            tldr_line = self._llm_tldr(self.results if isinstance(self.results, str) else str(self.results))
+        final_md = f"# {summary_title}\n\n**{tldr_line}**\n\n" + draft
         if trades_table_md:
             final_md += "\n\n## Trades (first 20)\n\n" + trades_table_md
         if equity_png:
@@ -944,6 +1033,56 @@ Write in markdown format:"""
         md_path = os.path.join(run_dir, 'report.md')
         with open(md_path, 'w') as f:
             f.write(final_md)
+        
+        # Save strategy.py (generated code)
+        strategy_path = os.path.join(run_dir, 'strategy.py')
+        with open(strategy_path, 'w') as f:
+            f.write(f"# Generated by NLBT on {datetime.now()}\n")
+            f.write(f"# {self._format_requirements()}\n\n")
+            f.write(self.code)
+        
+        # Save agent.log (full context for LLM)
+        if self.agent_logger:
+            # Metadata
+            self.agent_logger.info("=== METADATA ===")
+            self.agent_logger.info(f"timestamp: {datetime.now()}")
+            self.agent_logger.info(f"run_dir: {run_dir}")
+            try:
+                import subprocess
+                git_sha = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+                self.agent_logger.info(f"git_sha: {git_sha}")
+            except:
+                pass
+            self.agent_logger.info("")
+            
+            # Codebase snapshot
+            self.agent_logger.info("=== CODEBASE ===")
+            base_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+            for pattern in ["src/**/*.py", "*.toml", "README.md"]:
+                for file_path in glob.glob(os.path.join(base_dir, pattern), recursive=True):
+                    rel_path = os.path.relpath(file_path, base_dir)
+                    self.agent_logger.info(f"--- {rel_path} ---")
+                    try:
+                        with open(file_path, 'r', encoding='utf-8') as f:
+                            self.agent_logger.info(f.read())
+                    except:
+                        self.agent_logger.info("[Could not read file]")
+                    self.agent_logger.info("")
+            
+            # Conversation history
+            self.agent_logger.info("=== CONVERSATION ===")
+            self.agent_logger.info("\n".join(self.history))
+            self.agent_logger.info("")
+            
+            # Generated code
+            self.agent_logger.info("=== GENERATED CODE ===")
+            self.agent_logger.info(self.code)
+            self.agent_logger.info("")
+            
+            # Backtest output
+            self.agent_logger.info("=== BACKTEST OUTPUT ===")
+            self.agent_logger.info(self.results)
+            self.agent_logger.info("")
 
         # Try saving a simple PDF with matplotlib PdfPages (equity chart + text page)
         try:
@@ -978,13 +1117,16 @@ Write in markdown format:"""
         return f"""🎉 COMPLETE! All 3 phases finished successfully.
 
 📄 REPORT FOLDER: {run_dir}
-• Markdown: {md_path}
+• User report: report.md, report.pdf
+• Developer trace: debug.log, strategy.py
+• Agent context: agent.log
 
 📈 WHAT YOU GOT:
 • Complete backtest analysis with performance metrics
 • Strategy insights and recommendations  
 • Full Python code for reproducibility
 • Professional markdown report ready to share
+• Debug logs and full context for iteration
 
 💡 NEXT STEPS:
 • Check the report: {md_path}
@@ -992,6 +1134,32 @@ Write in markdown format:"""
 • Ask me to explain any results you don't understand
 
 ✨ Thanks for using the Reflection Backtesting Assistant!"""
+
+    def _llm_tldr(self, results_text: str) -> str:
+        """Produce a single-line summary: strategy, end date, cash, equity, portfolio."""
+        strategy = (self.requirements.get('strategy') or '').strip()
+        capital = (self.requirements.get('capital') or '').strip()
+        prompt = (
+            "You will receive: strategy text, initial capital, and raw backtest stats.\n"
+            "Output ONE line only, exactly in this format (no extra words):\n"
+            "Strategy: <STRATEGY> · End: <YYYY-MM-DD> · Initial: <INITIAL> · Equity: <EQUITY> · Portfolio: <PORTFOLIO>\n"
+            "Rules:\n"
+            "- STRATEGY: use the given strategy text as-is (shorten only if extremely long).\n"
+            "- INITIAL: echo the provided initial capital (keep currency symbol/commas if present).\n"
+            "- End: extract from stats (field 'End' or similar date). Use YYYY-MM-DD.\n"
+            "- Equity and Portfolio: use the ending equity from stats (e.g., 'Equity Final [$]').\n"
+            "- If multiple numeric formats appear, choose the clearest currency-labelled value.\n"
+            "- No newlines, no explanations, one single line.\n\n"
+            f"STRATEGY:\n{strategy}\n\n"
+            f"CAPITAL:\n{capital}\n\n"
+            f"STATS:\n{results_text}\n\n"
+            "ONE-LINE OUTPUT:"
+        )
+        try:
+            line = self.llm.ask(prompt).splitlines()[0].strip()
+            return line if line else "Summary unavailable"
+        except Exception:
+            return "Summary unavailable"
     
     def _get_history(self) -> str:
         """Get recent conversation with better context."""
