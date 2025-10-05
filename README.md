@@ -75,36 +75,43 @@ nlbt
 
 NLBT uses a **Reflection Pattern** with **Producer-Critic** loops for robust code generation:
 
+**Diagram Color Key:**
+- **Purple** - User actions/input
+- **Yellow** - LLM actions (AI reasoning/generation)
+- **Green** - System/sandbox (code execution)
+- **Orange** - Automatic decisions (code logic)
+- **Teal** - Phase states
+- **Gray** - Final outputs
+
 ```mermaid
 graph TD
     Start([User describes strategy]) --> P1[Phase 1: Understanding]
-
     P1 --> Extract[Extract requirements from conversation]
-    Extract --> Check{Complete & implementable?}
+    Extract --> Check{Complete &<br/>implementable?}
+    
     Check -->|Missing/unclear| Ask[Ask clarifying questions]
     Ask --> P1
+    
     Check -->|Complete & valid| Ready[Ready to Implement]
-
     Ready --> Present[Present plan to user]
     Present --> Response{User response}
-    Response -->|Change| P1
-    Response -->|Explain| ShowPlan[Show implementation approach]
-    ShowPlan --> Ready
-    Response -->|No| Ready
+    
+    Response -->|Anything else| BackToP1[Return to understanding]
+    BackToP1 --> P1
     Response -->|Yes/Go| P2[Phase 2: Implementation]
-
+    
     P2 --> Plan[Plan: LLM creates implementation plan]
     Plan --> Code[Producer: Generate Python code]
     Code --> Test[Test: Validate syntax & imports]
     Test --> Execute[Execute: Run in sandbox]
     Execute --> Critic[Critic: Evaluate results]
-
     Critic --> Decision{Critic decision}
+    
     Decision -->|PASS| P3[Phase 3: Reporting]
     Decision -->|RETRY| Count{Attempt < 3?}
     Count -->|Yes| Plan
-    Count -->|No| Fail[Report failure]
-
+    Count -->|No| Fail[Report failure & stop]
+    
     P3 --> ReportPlan[Plan: Structure report]
     ReportPlan --> Write[Write: Generate markdown]
     Write --> Refine[Refine: Polish & save]
@@ -122,20 +129,13 @@ graph TD
     %% Assign roles
     class Start user;
     class P1,P2,P3,Ready state;
-    class Extract,Ask,ShowPlan,Plan,Code,Critic,ReportPlan,Write,Refine llm;
-    class Test,Execute system;
+    class Extract,Ask,Plan,Code,Critic,ReportPlan,Write,Refine llm;
+    class Test,Execute,Present system;
     class Check,Decision,Count decision;
     class Response userInput;
     class Done,Fail output;
+    class BackToP1 system;
 ```
-
-**Legend:**
-- 🟣 **Purple** - User actions/input
-- 🟡 **Yellow** - LLM actions (AI reasoning/generation)  
-- 🟢 **Green** - System/sandbox (code execution)
-- 🟠 **Orange** - Automatic decisions (code logic)
-- 🔵 **Teal** - Phase states
-- ⚪ **Gray** - Final outputs
 
 ### Phase Details
 
@@ -157,6 +157,23 @@ graph TD
 1. **Plan**: Structure report sections
 2. **Write**: Generate comprehensive markdown analysis
 3. **Refine**: Polish and save to `reports/<TICKER>_<PERIOD>_<TIMESTAMP>/`
+
+### Simplified Confirmation Flow
+
+At the ready state, the system uses **smart conflict detection**:
+
+- **Proceed words**: `yes`, `go`, `proceed`, `ok`, `start`, `continue`
+- **Conflict words**: `but`, `change`, `explain`, `first`, `wait`, `think`, `over`, `else`
+
+**Logic**: If user input contains a proceed word AND no conflict words → proceed to implementation. Otherwise → return to understanding phase for natural conversation.
+
+**Examples**:
+- ✅ `"yes"` → Implementation
+- ✅ `"go for it"` → Implementation  
+- ✅ `"proceed with implementation"` → Implementation
+- 🔄 `"yes but change the ticker"` → Understanding (conflict: "but")
+- 🔄 `"go ahead and explain first"` → Understanding (conflict: "first")
+- 🔄 `"change to TSLA"` → Understanding (no proceed word)
 
 ## Use
 ```bash
