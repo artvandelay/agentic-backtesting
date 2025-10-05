@@ -1,33 +1,64 @@
 # NLBT — Natural Language Backtesting
 
-**Turn plain English into professional backtesting reports in minutes.**
+> **Turn plain English into professional backtesting reports in minutes.**  
+> Describe your trading strategy in natural language. Get Python code, backtest results, and professional reports. No coding required.
 
-Describe any trading strategy in natural language → Get Python code, backtest results, and a professional markdown report. No coding required.
+---
 
-**Cost**: <$0.50 per strategy with OpenRouter  
-**Time**: 2-3 minutes per strategy  
-**Output**: Professional reports with metrics, code, and insights
+## 🚀 Quick Start
 
-## ⚠️ Safety Warning
-**This tool runs AI-generated Python code locally. Use in trusted environments only.**
+```bash
+# 1. Install
+git clone https://github.com/yourusername/nlbt && cd nlbt
+pip install -e .
 
-## What You Get
+# 2. Configure LLM
+llm keys set openrouter
+llm models default openrouter/anthropic/claude-3.5-sonnet
 
-**Input**: "Buy and hold AAPL in 2024 with $10,000"  
-**Output**: Three-tier checkpoint system:
-- 📊 **User reports**: Professional markdown/PDF with metrics and insights
-- 💻 **Developer files**: Executable Python code + debug logs
-- 🤖 **Agent context**: Complete LLM-ready checkpoint for iteration
-- 📈 Full backtest results and trade analysis
+# 3. Run
+nlbt
+```
 
-**Sample outputs**: See `reports/EXAMPLE_simple_buy_hold_AAPL_2024.md` and `reports/EXAMPLE_RSI_strategy_NVDA_2023.md`
+**Try it**: Type `"Buy and hold AAPL in 2024 with $10,000"` and press enter.
 
-## Status & Limitations
-- ✅ **Functional**: Successfully generates backtests for single-ticker strategies
-- ⚠️ **WIP**: APIs, prompts, and behavior may change without notice  
-- 🔄 **Active Development**: Expect bugs; contributions and test reports welcome
-- 📈 **Best Results**: Works best with clear, specific strategy descriptions
-- 🎯 **Single Asset**: Multi-asset portfolio strategies not yet supported
+---
+
+## ✨ Key Benefits
+
+| Feature | Benefit |
+|---------|---------|
+| 💬 **Natural Language** | Describe strategies in plain English - no coding needed |
+| 🤖 **AI-Powered** | Uses Claude 3.5 Sonnet for robust code generation |
+| ⚡ **Fast** | Get results in 2-3 minutes, costs <$0.50 per strategy |
+| 🔄 **Self-Correcting** | Auto-retries up to 3 times with error recovery |
+| 📊 **Professional Reports** | Markdown + PDF with metrics, charts, and full code |
+| 🔧 **Three-Tier Output** | User reports, developer code, agent checkpoints |
+
+---
+
+## 📥 What You Get
+
+**Input**: 
+```
+"Buy and hold AAPL in 2024 with $10,000"
+```
+
+**Output** (saved to `reports/AAPL_2024_<timestamp>/`):
+- 📊 `report.md` / `report.pdf` - Professional analysis with metrics
+- 💻 `strategy.py` - Complete executable Python code
+- 🔍 `debug.log` - Execution trace for troubleshooting
+- 🤖 `agent.log` - Full context for LLM iteration
+
+**Sample outputs**: See `reports/EXAMPLE_*/`
+
+---
+
+## ⚠️ Important Notes
+
+- **Safety**: This tool runs AI-generated Python code locally. Use in trusted environments only.
+- **Status**: Functional for single-ticker strategies. APIs may change without notice.
+- **Limitations**: Multi-asset portfolios not yet supported. Works best with clear strategy descriptions.
 
 ## Requirements
 - Python 3.8+
@@ -71,17 +102,40 @@ nlbt
 - Saves report to `reports/<TICKER>_<PERIOD>_<TIMESTAMP>/report.md` (+ PDF)
 - Takes 2-3 minutes total
 
-## How it works (3-phase agentic architecture)
+---
 
-NLBT uses a **Reflection Pattern** with **Producer-Critic** loops for robust code generation:
+## 💬 Usage
 
-**Diagram Color Key:**
-- **Purple** - User actions/input
-- **Yellow** - LLM actions (AI reasoning/generation)
-- **Green** - System/sandbox (code execution)
-- **Orange** - Automatic decisions (code logic)
-- **Teal** - Phase states
-- **Gray** - Final outputs
+```bash
+nlbt                    # Start interactive session
+```
+
+**In-chat commands:**
+- `info` - Show current phase and requirements
+- `debug` - Show internal state  
+- `lucky` - Quick demo with AAPL
+- `exit` - Quit
+
+---
+
+## 🔄 How It Works
+
+NLBT uses a **3-phase agentic workflow** with automatic error recovery:
+
+### Simple Overview
+
+1. **🔍 Understanding** - Chat with AI to gather requirements (ticker, period, capital, strategy)
+2. **⚙️ Implementation** - AI generates Python code, tests it, and auto-retries if needed
+3. **📊 Reporting** - AI creates professional analysis with metrics and insights
+
+### Visual Workflow
+
+<details>
+<summary>Click to see detailed architecture diagram</summary>
+
+**Color Key:**
+- **Purple** = User actions | **Yellow** = LLM actions | **Green** = System/sandbox
+- **Orange** = Decisions | **Teal** = Phase states | **Gray** = Outputs
 
 ```mermaid
 graph TD
@@ -138,71 +192,16 @@ graph TD
     class BackToP1,FailBack system;
 ```
 
-### Phase Details
+</details>
 
-**Phase 1 - Understanding** 🔍
-- Conversational requirement extraction using LLM
-- Gathers: Ticker, Period, Capital, Strategy description
-- Asks clarifying questions until all 4 requirements are complete
-- Transitions to "ready" state for user confirmation
+### Key Features
 
-**Phase 2 - Implementation** ⚙️ (Producer-Critic Pattern)
-1. **Plan**: LLM creates detailed implementation plan
-2. **Producer**: Strong model (Claude 3.5 Sonnet) generates Python code
-3. **Test**: Validates syntax, imports, and structure
-4. **Execute**: Runs code in isolated sandbox with financial libraries
-5. **Critic**: Separate LLM evaluates results (PASS/RETRY)
-6. **Loop**: Auto-retries up to 3 times with error feedback
-7. **Failure Recovery**: After 3 failed attempts, returns to understanding phase with error context for user to modify strategy
+- **Smart Confirmation**: Say "yes" to proceed, anything else returns to conversation
+- **Auto-Retry**: Up to 3 attempts with error feedback
+- **Error Recovery**: After failures, returns to chat with error context
+- **Producer-Critic Pattern**: Separate AI for generation and evaluation (reduces bias)
 
-**Phase 3 - Reporting** 📊 (Plan-Write-Refine)
-1. **Plan**: Structure report sections
-2. **Write**: Generate comprehensive markdown analysis
-3. **Refine**: Polish and save to `reports/<TICKER>_<PERIOD>_<TIMESTAMP>/`
-
-### Simplified Confirmation Flow
-
-At the ready state, the system uses **smart conflict detection**:
-
-- **Proceed words**: `yes`, `go`, `proceed`, `ok`, `start`, `continue`
-- **Conflict words**: `but`, `change`, `explain`, `first`, `wait`, `think`, `over`, `else`
-
-**Logic**: If user input contains a proceed word AND no conflict words → proceed to implementation. Otherwise → return to understanding phase for natural conversation.
-
-**Examples**:
-- ✅ `"yes"` → Implementation
-- ✅ `"go for it"` → Implementation  
-- ✅ `"proceed with implementation"` → Implementation
-- 🔄 `"yes but change the ticker"` → Understanding (conflict: "but")
-- 🔄 `"go ahead and explain first"` → Understanding (conflict: "first")
-- 🔄 `"change to TSLA"` → Understanding (no proceed word)
-
-## Use
-```bash
-nlbt                    # Start interactive session
-```
-
-**In-chat commands:**
-- `info` - Show current phase and gathered requirements
-- `debug` - Show internal state for troubleshooting  
-- `lucky` - Quick demo: "Buy and hold AAPL in 2024 with $10,000"
-- `exit` - Quit
-
-### Reports output
-Each run saves to `reports/<TICKER>_<PERIOD>_<TIMESTAMP>/` with **three-tier output**:
-
-**For Users** 👥
-- `report.md` - Professional markdown report with metrics and insights
-- `report.pdf` - PDF version (auto-generated)
-
-**For Developers** 🔧
-- `strategy.py` - Complete executable Python code with requirements header
-- `debug.log` - Execution trace and debugging information
-
-**For Agents** 🤖
-- `agent.log` - Full context dump for LLM iteration (codebase + conversation + execution)
-- ~6,000-8,000 words, fits easily in modern LLM contexts
-- Another LLM can recreate the entire run from this checkpoint
+---
 
 ## Examples (realistic conversations)
 
@@ -273,7 +272,12 @@ Each run saves to `reports/<TICKER>_<PERIOD>_<TIMESTAMP>/` with **three-tier out
 💭 You: yes
 ```
 
-## Troubleshooting
+---
+
+## 🔧 Troubleshooting
+
+<details>
+<summary>Common Issues & Solutions</summary>
 
 ### "Unknown model" error
 ```bash
@@ -304,7 +308,10 @@ llm models default [model-name]    # Set default
 - Check `reports/` folder for any partial outputs
 - Restart with `exit` and try again
 
-## Alternative LLM Providers
+</details>
+
+<details>
+<summary>Alternative LLM Providers</summary>
 
 **OpenAI**:
 ```bash
@@ -318,56 +325,66 @@ llm keys set anthropic
 llm models default claude-3-5-sonnet-20241022
 ```
 
-## Project structure
-```
-src/nlbt/
-├── __init__.py
-├── cli.py              # Interactive CLI with rich formatting
-├── reflection.py       # 3-phase reflection engine (1,251 lines)
-│                       # - Phase 1: Understanding (requirement extraction)
-│                       # - Phase 2: Implementation (Producer-Critic loop)
-│                       # - Phase 3: Reporting (Plan-Write-Refine)
-├── llm.py              # Simple LLM wrapper using `llm` CLI
-├── llm/
-│   └── client.py       # Enhanced LLM client
-└── sandbox.py          # Safe code execution + get_ohlcv_data()
+</details>
 
-reports/                # Generated backtest reports
-├── <TICKER>_<PERIOD>_<TIMESTAMP>/
-│   ├── report.md       # User: Professional markdown report
-│   ├── report.pdf      # User: PDF version (auto-generated)
-│   ├── strategy.py     # Developer: Executable Python code
-│   ├── debug.log       # Developer: Execution trace
-│   └── agent.log       # Agent: Full context for LLM iteration
-└── EXAMPLE_*.md        # Sample output reports
-
-cursor_chats/           # Development notes & architecture docs
-tests/                  # Unit and integration tests
-scripts/                # Setup and demo scripts
-```
-
-## Architecture & Design
-
-This project implements several **Agentic Design Patterns**:
-
-- **Reflection Pattern**: 3-phase autonomous workflow with LLM controlling transitions
-- **Producer-Critic Pattern**: Separate models for generation (Producer) and evaluation (Critic) to avoid confirmation bias
-- **Planning Pattern**: Phase 2 plans before coding; Phase 3 plans before writing
-- **Tool Use Pattern**: Sandbox execution, data fetching, indicator calculations
-- **Prompt Chaining**: Phase transitions chain prompts with context
-- **Error Recovery**: Auto-retry loop (max 3 attempts) with error feedback
-- **Checkpoint Pattern**: Three-tier output (user/developer/agent) for complete reproducibility and iteration
-
-See `cursor_chats/Agentic_Design_Patterns_Complete.md` for detailed pattern documentation.
-
-## Contributing
+## 🤝 Contributing
 
 Contributions welcome! Areas of interest:
 - Multi-asset portfolio backtesting
-- Additional technical indicators
+- Additional technical indicators  
 - Parameter optimization
 - Risk management strategies
 - Interactive visualizations
 
-## License
+See issues or open a PR!
+
+---
+
+## 📄 License
+
 MIT License. See `LICENSE`.
+
+---
+
+## 🏗️ Technical Details
+
+<details>
+<summary>Project Structure</summary>
+
+```
+src/nlbt/
+├── cli.py              # Interactive CLI with rich formatting
+├── reflection.py       # 3-phase reflection engine
+├── llm.py              # LLM wrapper using `llm` CLI
+└── sandbox.py          # Safe code execution
+
+reports/                # Generated backtest reports
+├── <TICKER>_<PERIOD>_<TIMESTAMP>/
+│   ├── report.md       # User: Professional report
+│   ├── report.pdf      # User: PDF version
+│   ├── strategy.py     # Developer: Executable code
+│   ├── debug.log       # Developer: Execution trace
+│   └── agent.log       # Agent: Full LLM context
+└── EXAMPLE_*/          # Sample outputs
+
+tests/                  # Unit and integration tests
+```
+
+</details>
+
+<details>
+<summary>Architecture & Design Patterns</summary>
+
+This project implements several **Agentic Design Patterns**:
+
+- **Reflection Pattern**: 3-phase autonomous workflow with LLM controlling transitions
+- **Producer-Critic Pattern**: Separate models for generation and evaluation (avoids confirmation bias)
+- **Planning Pattern**: Phase 2 plans before coding; Phase 3 plans before writing
+- **Tool Use Pattern**: Sandbox execution, data fetching, indicator calculations
+- **Prompt Chaining**: Phase transitions chain prompts with context
+- **Error Recovery**: Auto-retry loop (max 3 attempts) with error feedback
+- **Checkpoint Pattern**: Three-tier output (user/developer/agent) for reproducibility
+
+See `cursor_chats/Agentic_Design_Patterns_Complete.md` for detailed documentation.
+
+</details>
