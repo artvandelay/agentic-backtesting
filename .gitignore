@@ -3,6 +3,7 @@
 
 # Reports and caches
 reports/
+!reports/EXAMPLE_*/
 .cache/
 __pycache__/
 .pytest_cache/
