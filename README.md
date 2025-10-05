@@ -30,7 +30,7 @@ nlbt
 |---------|---------|
 | 💬 **Natural Language** | Describe strategies in plain English - no coding needed |
 | 🤖 **AI-Powered** | Uses Claude 3.5 Sonnet for robust code generation |
-| ⚡ **Fast** | Get results in 2-3 minutes, costs <$0.50 per strategy |
+| ⚡ **Fast** | Get results in 2-3 minutes, costs <$0.10 per strategy |
 | 🔄 **Self-Correcting** | Auto-retries up to 3 times with error recovery |
 | 📊 **Professional Reports** | Markdown + PDF with metrics, charts, and full code |
 | 🔧 **Three-Tier Output** | User reports, developer code, agent checkpoints |
@@ -411,7 +411,9 @@ See issues or open a PR!
 
 ## 📄 License
 
-MIT License. See `LICENSE`.
+GPL-3.0 License. See `LICENSE`.
+
+This is copyleft software - any derivative works must also be open source under GPL-3.0.
 
 ---
 
