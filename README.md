@@ -43,10 +43,14 @@ nlbt
 
 **You type:**
 ```
-"Buy and hold AAPL in 2024 with $10,000"
+"Buy and hold AAPL in 2024 with $10000"
 ```
 
 **You get** (in `reports/AAPL_2024_<timestamp>/`):
+
+> 📁 **See actual example**: [`reports/EXAMPLE_AAPL_2024/`](reports/EXAMPLE_AAPL_2024/)  
+> 📄 **View report**: [`report.md`](reports/EXAMPLE_AAPL_2024/report.md) | [`report.pdf`](reports/EXAMPLE_AAPL_2024/report.pdf)  
+> 💻 **View code**: [`strategy.py`](reports/EXAMPLE_AAPL_2024/strategy.py)
 
 #### 📊 Professional Report (`report.md` / `report.pdf`)
 ```markdown
@@ -118,8 +122,6 @@ except Exception:
 #### 🔍 Debug & Agent Logs
 - `debug.log` - Execution trace for troubleshooting
 - `agent.log` - Full LLM context for iteration (~6-8K words)
-
-**See real examples**: `reports/EXAMPLE_*/`
 
 ---
 
