@@ -14,11 +14,11 @@ Describe any trading strategy in natural language → Get Python code, backtest 
 ## What You Get
 
 **Input**: "Buy and hold AAPL in 2024 with $10,000"  
-**Output**: Professional report with:
-- 📊 Performance metrics (Return %, Sharpe Ratio, Max Drawdown)
-- 📈 Full backtest results and trade analysis  
-- 💻 Complete Python code for reproducibility
-- 📄 Markdown + PDF report ready to share
+**Output**: Three-tier checkpoint system:
+- 📊 **User reports**: Professional markdown/PDF with metrics and insights
+- 💻 **Developer files**: Executable Python code + debug logs
+- 🤖 **Agent context**: Complete LLM-ready checkpoint for iteration
+- 📈 Full backtest results and trade analysis
 
 **Sample outputs**: See `reports/EXAMPLE_simple_buy_hold_AAPL_2024.md` and `reports/EXAMPLE_RSI_strategy_NVDA_2023.md`
 
@@ -170,10 +170,20 @@ nlbt                    # Start interactive session
 - `exit` - Quit
 
 ### Reports output
-- Each run saves to `reports/<TICKER>_<PERIOD>_<TIMESTAMP>/`
-  - `report.md` - Markdown version
-  - `report.pdf` - PDF version (if generation succeeds)
-- Includes performance metrics, trade analysis, and full Python code
+Each run saves to `reports/<TICKER>_<PERIOD>_<TIMESTAMP>/` with **three-tier output**:
+
+**For Users** 👥
+- `report.md` - Professional markdown report with metrics and insights
+- `report.pdf` - PDF version (auto-generated)
+
+**For Developers** 🔧
+- `strategy.py` - Complete executable Python code with requirements header
+- `debug.log` - Execution trace and debugging information
+
+**For Agents** 🤖
+- `agent.log` - Full context dump for LLM iteration (codebase + conversation + execution)
+- ~6,000-8,000 words, fits easily in modern LLM contexts
+- Another LLM can recreate the entire run from this checkpoint
 
 ## Examples (realistic conversations)
 
@@ -305,8 +315,11 @@ src/nlbt/
 
 reports/                # Generated backtest reports
 ├── <TICKER>_<PERIOD>_<TIMESTAMP>/
-│   ├── report.md       # Markdown report
-│   └── report.pdf      # PDF version (auto-generated)
+│   ├── report.md       # User: Professional markdown report
+│   ├── report.pdf      # User: PDF version (auto-generated)
+│   ├── strategy.py     # Developer: Executable Python code
+│   ├── debug.log       # Developer: Execution trace
+│   └── agent.log       # Agent: Full context for LLM iteration
 └── EXAMPLE_*.md        # Sample output reports
 
 cursor_chats/           # Development notes & architecture docs
@@ -324,6 +337,7 @@ This project implements several **Agentic Design Patterns**:
 - **Tool Use Pattern**: Sandbox execution, data fetching, indicator calculations
 - **Prompt Chaining**: Phase transitions chain prompts with context
 - **Error Recovery**: Auto-retry loop (max 3 attempts) with error feedback
+- **Checkpoint Pattern**: Three-tier output (user/developer/agent) for complete reproducibility and iteration
 
 See `cursor_chats/Agentic_Design_Patterns_Complete.md` for detailed pattern documentation.
 
