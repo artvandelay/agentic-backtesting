@@ -110,7 +110,8 @@ graph TD
     Decision -->|PASS| P3[Phase 3: Reporting]
     Decision -->|RETRY| Count{Attempt < 3?}
     Count -->|Yes| Plan
-    Count -->|No| Fail[Report failure & stop]
+    Count -->|No| FailBack[Show error & return to understanding]
+    FailBack --> P1
     
     P3 --> ReportPlan[Plan: Structure report]
     ReportPlan --> Write[Write: Generate markdown]
@@ -133,8 +134,8 @@ graph TD
     class Test,Execute,Present system;
     class Check,Decision,Count decision;
     class Response userInput;
-    class Done,Fail output;
-    class BackToP1 system;
+    class Done output;
+    class BackToP1,FailBack system;
 ```
 
 ### Phase Details
@@ -152,6 +153,7 @@ graph TD
 4. **Execute**: Runs code in isolated sandbox with financial libraries
 5. **Critic**: Separate LLM evaluates results (PASS/RETRY)
 6. **Loop**: Auto-retries up to 3 times with error feedback
+7. **Failure Recovery**: After 3 failed attempts, returns to understanding phase with error context for user to modify strategy
 
 **Phase 3 - Reporting** 📊 (Plan-Write-Refine)
 1. **Plan**: Structure report sections

@@ -252,7 +252,11 @@ RESPOND ONLY to the current user message. Do NOT create fake conversations."""
         if attempt > 3:
             if self.debug_logger:
                 self.debug_logger.info(f"Failed after 3 attempts. Last error: {self.last_error}")
-            return f"❌ Failed after 3 attempts.\n\nLast error:\n{self.last_error}"
+            
+            # Return to understanding phase with full context
+            self.phase = "understanding"
+            error_msg = f"❌ Failed after 3 attempts.\n\nLast error:\n{self.last_error}\n\nLet's try a different approach."
+            return error_msg + "\n\n" + self._phase1_understanding("I need help fixing this strategy", from_confirmation=True)
         
         print(f"🔄 Attempt {attempt}/3 - Generating/Testing/Executing...")
         if self.debug_logger:
