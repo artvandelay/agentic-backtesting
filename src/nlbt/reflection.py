@@ -1012,34 +1012,76 @@ Write in markdown format:"""
             self.agent_logger.info(self.results)
             self.agent_logger.info("")
 
-        # Try saving a simple PDF with matplotlib PdfPages (equity chart + text page)
+        # Convert markdown to PDF
         try:
-            import matplotlib.pyplot as plt  # type: ignore
-            from matplotlib.backends.backend_pdf import PdfPages  # type: ignore
+            # Try using pandoc first (best quality)
+            import subprocess
             pdf_path = os.path.join(run_dir, 'report.pdf')
-            with PdfPages(pdf_path) as pdf:
-                # Page 1: Title
-                plt.figure(figsize=(8.27, 11.69))
-                plt.axis('off')
-                plt.text(0.5, 0.9, 'NLBT Backtest Report', ha='center', va='center', fontsize=18)
-                plt.text(0.1, 0.8, self._format_requirements(), ha='left', va='top', fontsize=10, family='monospace')
-                pdf.savefig(); plt.close()
-                # Page 2: Equity
-                if equity_png:
-                    img = plt.imread(equity_png)
+            result = subprocess.run([
+                'pandoc', md_path, '-o', pdf_path,
+                '--pdf-engine=xelatex',
+                '--variable', 'geometry:margin=1in'
+            ], capture_output=True, text=True, timeout=30)
+            
+            if result.returncode != 0:
+                raise Exception(f"Pandoc failed: {result.stderr}")
+                
+        except (FileNotFoundError, subprocess.TimeoutExpired, Exception):
+            # Fallback: Try weasyprint
+            try:
+                import weasyprint
+                from markdown import markdown
+                
+                # Convert markdown to HTML first
+                with open(md_path, 'r') as f:
+                    md_content = f.read()
+                
+                html_content = f"""
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="UTF-8">
+                    <style>
+                        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; 
+                              line-height: 1.6; max-width: 800px; margin: 0 auto; padding: 20px; }}
+                        h1 {{ color: #2c3e50; border-bottom: 2px solid #3498db; }}
+                        h2 {{ color: #34495e; margin-top: 30px; }}
+                        table {{ border-collapse: collapse; width: 100%; margin: 20px 0; }}
+                        th, td {{ border: 1px solid #ddd; padding: 8px; text-align: left; }}
+                        th {{ background-color: #f2f2f2; }}
+                        code {{ background-color: #f8f9fa; padding: 2px 4px; border-radius: 3px; }}
+                        pre {{ background-color: #f8f9fa; padding: 15px; border-radius: 5px; overflow-x: auto; }}
+                    </style>
+                </head>
+                <body>
+                {markdown(md_content, extensions=['tables', 'fenced_code'])}
+                </body>
+                </html>
+                """
+                
+                pdf_path = os.path.join(run_dir, 'report.pdf')
+                weasyprint.HTML(string=html_content).write_pdf(pdf_path)
+                
+            except ImportError:
+                # Final fallback: Simple matplotlib PDF (current implementation)
+                import matplotlib.pyplot as plt
+                from matplotlib.backends.backend_pdf import PdfPages
+                
+                pdf_path = os.path.join(run_dir, 'report.pdf')
+                with PdfPages(pdf_path) as pdf:
+                    # Page 1: Title and summary
                     plt.figure(figsize=(8.27, 11.69))
                     plt.axis('off')
-                    plt.imshow(img)
-                    pdf.savefig(); plt.close()
-                # Page 3: Trades (text block)
-                if trades_table_md:
-                    plt.figure(figsize=(8.27, 11.69))
-                    plt.axis('off')
-                    plt.text(0.05, 0.95, 'Trades (first 20)', ha='left', va='top', fontsize=12)
-                    plt.text(0.05, 0.9, trades_table_md, ha='left', va='top', fontsize=7, family='monospace')
-                    pdf.savefig(); plt.close()
-        except Exception:
-            pass
+                    plt.text(0.5, 0.95, 'NLBT Backtest Report', ha='center', va='top', fontsize=18, weight='bold')
+                    
+                    # Add the report content as text (first 2000 chars)
+                    with open(md_path, 'r') as f:
+                        content = f.read()[:2000] + "..." if len(f.read()) > 2000 else f.read()
+                    
+                    plt.text(0.05, 0.85, content, ha='left', va='top', fontsize=8, 
+                            family='monospace', wrap=True)
+                    pdf.savefig()
+                    plt.close()
         
         self.phase = "complete"
         return f"""🎉 COMPLETE! All 3 phases finished successfully.

@@ -2,116 +2,140 @@
 
 **Strategy:  · End: 2024-12-30 00:00:00 · Initial: 10000.0 · Equity: 13887.788195919456 · Portfolio: 13887.788195919456**
 
+```markdown
 # Backtest Report
 
 ## 1. Summary
-- **Report Date**: [Insert Date of the Report]
-- **Test Start Date**: 2024-01-02
-- **Test End Date**: 2024-12-30
-- **Total Duration**: 363 days
-- **Initial Capital**: $10,000
-- **Final Equity**: $13,887.79
-- **Absolute Return**: $3,887.79
-- **Percentage Return**: 38.88%
-- **Annualized Return**: 39.06%
-- **CAGR**: 25.61%
-- **Max. Drawdown**: -15.26%
+- **Start Date:** 2024-01-02
+- **End Date:** 2024-12-30
+- **Duration:** 363 days
+- **Initial Investment:** $10,000
+- **Final Equity:** $13,887.79
+- **Absolute PnL:** $3,887.79
+- **Percentage Return:** 38.88%
+- **Annualized Return:** 39.06%
 
 ## 2. Strategy
-- **Strategy Name**: MyStrategy
-- **Description**: This strategy employs a simple buying mechanism, entering trades based on predefined conditions (in this case, whenever no positions are open).
-- **Parameters Identified**: 
-  - **Entry Criteria**: Enter positions when no current positions are held.
-  - **Exit Criteria**: No specific exit criteria were defined, leading to no trades being executed.
-  - **Risk Management**: No explicit risk management strategies (e.g., stop-loss or take-profit) were implemented.
+- **Strategy Name:** MyStrategy
+- **Description:** This strategy leverages simple market entry signals with the goal of capitalizing on upward trends in the stock market. The assumption is that market movements can be anticipated, leading to timely purchases that generate returns over time.
+- **Parameters:** N/A (the strategy currently has no specific parameters implemented apart from a basic buy signal).
+- **Rationale:** The strategy was designed to initiate a long position whenever the market is favorable, aiming for significant upward movements based on overall market trends.
 
 ## 3. Results
-- **Performance Metrics**:
-  - Final Equity: $13,887.79
-  - Peak Equity: $14,261.56
-  - Return: 38.88%
-  - Buy & Hold Return: 36.52%
-  - Annualized Volatility: 31.29%
+
+### 3.1 Performance Metrics
+- **Return Metrics:**
+  - Return [%]: 38.88%
+  - Buy & Hold Return [%]: 36.52%
+  - CAGR [%]: 25.61%
+  
+- **Risk Metrics:**
+  - Volatility (Ann.) [%]: 31.29%
   - Sharpe Ratio: 1.25
   - Sortino Ratio: 2.76
   - Calmar Ratio: 2.56
-  - Alpha: 2.74%
-  - Beta: 0.99
-  - Max Drawdown: -15.26%
-  - Avg Drawdown: -3.40%
-  - Total Trades: 0
-  - Win Rate: NaN (No trades initiated)
+
+- **Drawdowns:**
+  - Max. Drawdown [%]: -15.26%
+  - Avg. Drawdown [%]: -3.40%
+  - Max. Drawdown Duration: 134 days
+  - Avg. Drawdown Duration: 22 days
+
+### 3.2 Trading Activity
+- **Total Trades:** 0 (No trades executed)
+- **Win Rate [%]:** NaN (Not applicable)
+- **Profit Factor:** NaN (Not applicable)
+
+### 3.3 Equity Curve
+- **Visualization:** ![Equity Curve](URL_to_equity_curve_image) (placeholder for actual equity curve graph)
   
-### 3.1 Statistics Tables:
-- **TRADES_TABLE**: 
-  | Size   | EntryBar   | ExitBar   | EntryPrice   | ExitPrice   | SL   | TP   | PnL   | Commission   | ReturnPct   | EntryTime   | ExitTime   | Duration   | Tag   |
-  |--------|------------|-----------|--------------|-------------|------|------|-------|--------------|-------------|-------------|------------|------------|-------|
-  | — | — | — | — | — | — | — | — | — | — | — | — | — | — |
-  
-- **TRADES_CSV**: [Link to full CSV of trades or indicate 'No trades executed'](data/trades.csv)
-  
-- **EQUITY_CSV**: [Link to full CSV of equity curve](data/equity.csv)
+- **Equity Data:**
+  - **Equity Peak:** $14,261.56
+  - **Equity at Drawdown:** $10,621.78
+
+### 3.4 Trading Data
+- **Trades Overview Table:** 
+    ```markdown
+    | Size   | EntryBar   | ExitBar   | EntryPrice   | ExitPrice   | SL   | TP   | PnL   | Commission   | ReturnPct   | EntryTime   | ExitTime   | Duration   | Tag   |
+    |--------|------------|-----------|--------------|-------------|------|------|-------|--------------|-------------|-------------|------------|------------|-------|
+    | N/A    | N/A        | N/A       | N/A          | N/A         | N/A  | N/A  | N/A   | N/A          | N/A         | N/A         | N/A        | N/A        | N/A   |
+    ```
+
+- **Trades CSV:**
+    - (Empty DataFrame, no trades executed.)
+
+- **Equity CSV:**
+    - (Link or summary not applicable as there were no trades.)
 
 ## 4. Insights
-- **Market Conditions**: The strategy was tested during a market that experienced fluctuations, but specific market conditions were not identified or incorporated into the strategy design.
+- **General Observations:** 
+  - The strategy showed a strong overall performance, with a 38.88% return over the year, outperforming the buy-and-hold strategy. However, the absence of executed trades indicates that the strategy may have had limited opportunities or conditions suitable for execution.
   
-- **Performance Analysis**: The strategy did not execute any trades during the test period due to the lack of active entry and exit conditions. This led to a passive increase in equity based solely on market conditions.
+- **Comparative Analysis:**
+  - Comparing the strategy's performance versus the market benchmarks, the strategy outperformed the buy-and-hold return of 36.52%. This suggests that the strategy's signal could be more effective in maximizing returns over a long period, but the execution needs optimization to capitalize on actual trades.
 
-- **Lessons Learned**: It highlights the importance of defining clear entry and exit strategies, alongside active risk management, to succeed in dynamic markets.
+- **Potential Improvements:**
+  - Consider introducing more complex signal parameters or conditions to trigger trades, enhancing the chances of executing profitable trades.
+  - Analyze historical volatility to adjust position sizing dynamically, potentially improving risk management and reducing maximum drawdowns.
 
-- **Recommendations for Future Testing**: 
-  - Define specific entry and exit criteria that align with the prevailing market conditions.
-  - Implement risk management measures, such as stop-loss orders and take-profit targets, to better protect and optimize returns.
+- **Limitations:**
+  - The backtest period did not yield any trades, raising concerns about the effectiveness of the strategy in various market conditions. The strategy may need refinement to respond to market trends effectively.
 
 ## 5. Code
-- **Backtesting Code**:
-   ```python
-   from backtesting import Backtest, Strategy
+```python
+from backtesting import Backtest, Strategy
 
-   data = get_ohlcv_data('AAPL', '2024-01-01', '2024-12-31')
+data = get_ohlcv_data('AAPL', '2024-01-01', '2024-12-31')
 
-   class MyStrategy(Strategy):
-       def init(self):
-           pass
+class MyStrategy(Strategy):
+    def init(self):
+        pass
+    
+    def next(self):
+        if not self.position:
+            self.buy()
 
-       def next(self):
-           if not self.position:
-               self.buy()
+bt = Backtest(data, MyStrategy, cash=10000)
+stats = bt.run()
+print(stats)
 
-   bt = Backtest(data, MyStrategy, cash=10000)
-   stats = bt.run()
-   print(stats)
-   ```
-  
-- **Statistical Output Code**:
-   ```python
-   import json
-   import pandas as pd
+# Emit structured artifacts for reporting
+import json
+try:
+    # Trades preview table
+    import pandas as pd
+    print("TRADES_TABLE")
+    print(stats._trades.head(20).to_markdown(index=False))
+except Exception:
+    pass
 
-   # Emit structured artifacts for reporting
-   print("TRADES_TABLE")
-   print(stats._trades.head(20).to_markdown(index=False))
-   
-   print("TRADES_CSV")
-   print(stats._trades.to_csv(index=False))
+# Full CSVs for optional charts/tables
+try:
+    import pandas as pd
+    print("TRADES_CSV"); print(stats._trades.to_csv(index=False))
+    print("EQUITY_CSV"); print(stats._equity_curve.to_csv(index=False))
+except Exception:
+    pass
 
-   print("EQUITY_CSV")
-   print(stats._equity_curve.to_csv(index=False))
+# Compact summary for TL;DR
+try:
+    end_date = str(stats.get('End', '')) or (str(data.index[-1].date()) if hasattr(data, 'index') and len(data.index) else '')
+    equity_final = float(stats.get('Equity Final [$]', 0))
+    initial_cap = float(10000)
+    pnl_abs = equity_final - initial_cap
+    pnl_pct = float(stats.get('Return [%]', 0))
+    print("SUMMARY_JSON"); print(json.dumps(dict(
+        end=end_date,
+        initial=initial_cap,
+        equity_final=equity_final,
+        portfolio_final=equity_final,
+        pnl_abs=pnl_abs,
+        pnl_pct=pnl_pct
+    )))
+except Exception:
+    pass
+```
 
-   print("SUMMARY_JSON")
-   end_date = str(stats.get('End', '')) or (str(data.index[-1].date()) if hasattr(data, 'index') and len(data.index) else '')
-   equity_final = float(stats.get('Equity Final [$]', 0))
-   initial_cap = float(10000)
-   pnl_abs = equity_final - initial_cap
-   pnl_pct = float(stats.get('Return [%]', 0))
-   print(json.dumps(dict(
-       end=end_date,
-       initial=initial_cap,
-       equity_final=equity_final,
-       portfolio_final=equity_final,
-       pnl_abs=pnl_abs,
-       pnl_pct=pnl_pct
-   )))
-   ```
-
-This structured report provides a comprehensive overview of the backtest results, making it easier for stakeholders to assess the performance and viability of the strategy. Further refinement in approach and strategy can lead to improved outcomes in subsequent testing phases.
+### Conclusion
+The current backtest highlights the effectiveness of the strategy in terms of return, but the lack of executed trades indicates a need for further evaluation and development. Future iterations of this strategy should focus on refining trade entry conditions while also introducing exit signals to maximize potential returns. Further analysis on market conditions during the backtest period could provide valuable insights for strategy enhancement.
+```

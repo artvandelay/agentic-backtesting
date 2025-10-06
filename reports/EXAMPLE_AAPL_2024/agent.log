@@ -1,7 +1,7 @@
 === METADATA ===
-timestamp: 2025-10-06 02:29:08.666112
-run_dir: reports/AAPL_2024_20251006_022824
-git_sha: b3077fdb6529282666478bc5795881312e73fcc9
+timestamp: 2025-10-06 05:28:08.342756
+run_dir: reports/AAPL_2024_20251006_052718
+git_sha: 1590dc9a306f3b621696de77442d7b841579c4b5
 
 === CODEBASE ===
 --- src/nlbt/reflection.py ---
@@ -103,7 +103,7 @@ class ReflectionEngine:
         self.history.append(f"Agent: {response}")
         return response
     
-    def _phase1_understanding(self, user_input: str) -> str:
+    def _phase1_understanding(self, user_input: str, from_confirmation: bool = False) -> str:
         """Phase 1: Gather requirements until LLM says READY."""
         
         # First, try to extract requirements from the conversation
@@ -165,7 +165,8 @@ RESPOND ONLY to the current user message. Do NOT create fake conversations."""
         has_strategy = bool(self.requirements.get('strategy'))
 
         # If we have all requirements, validate against scaffold before READY
-        if has_ticker and has_period and has_capital and has_strategy:
+        # BUT skip auto-proceed if we're coming from confirmation step
+        if has_ticker and has_period and has_capital and has_strategy and not from_confirmation:
             validation = self._validate_requirements_with_codebase()
             self.last_validation = validation
             if validation.get("implementable"):
@@ -226,116 +227,43 @@ RESPOND ONLY to the current user message. Do NOT create fake conversations."""
         """Handle user confirmation before starting implementation."""
         user_lower = user_input.lower().strip()
         
-        # Check for proceed signals
-        if any(word in user_lower for word in ["yes", "go", "proceed", "ok", "start", "continue"]):
+        # Check for proceed signals (whole word matching)
+        import re
+        proceed_words = ["yes", "go", "proceed", "ok", "start", "continue"]
+        proceed_pattern = r'\b(' + '|'.join(proceed_words) + r')\b'
+        
+        # Check for conflicting words that indicate it's not a simple proceed
+        conflict_words = ["but", "change", "explain", "first", "wait", "think", "over", "else"]
+        has_conflict = any(word in user_lower for word in conflict_words)
+        
+        if re.search(proceed_pattern, user_lower) and not has_conflict:
+            # Proceed if we have a proceed word AND no conflicting words
             self.phase = "implementation"
             
             # Immediately start implementation instead of just showing a message
             implementation_result = self._phase2_implementation()
             return implementation_result
         
-        # Check for change requests (including 'sorry')
-        if any(word in user_lower for word in ["change", "modify", "update", "actually", "sorry"]):
-            self.phase = "understanding"
-            
-            # Track old values for smart substitution
-            old_ticker = self.requirements.get("ticker")
-            old_capital = self.requirements.get("capital")
-            
-            # CRITICAL FIX: Clear requirements that user wants to change
-            # Look for what they're changing
-            if "period" in user_lower or "date" in user_lower or any(year in user_input for year in ["2010", "2011", "2012", "2013", "2014", "2015", "2016", "2017", "2018", "2019", "2020", "2021", "2022", "2023", "2024"]):
-                self.requirements.pop("period", None)
-            
-            if "ticker" in user_lower or "stock" in user_lower or any(ticker in user_input.upper() for ticker in ["AAPL", "MSFT", "GOOGL", "TSLA", "NVDA", "SPY", "QQQ", "AMZN", "META"]):
-                self.requirements.pop("ticker", None)
-            
-            if "capital" in user_lower or "$" in user_input or "money" in user_lower:
-                self.requirements.pop("capital", None)
-            
-            if "strategy" in user_lower:
-                self.requirements.pop("strategy", None)
-            
-            # Re-extract from new input
-            self._update_requirements_from_conversation(user_input)
-            
-            # SMART SUBSTITUTION: Update strategy text if ticker or capital changed
-            if "strategy" in self.requirements:
-                strategy = self.requirements["strategy"]
-                
-                # If ticker changed, replace old ticker with new ticker in strategy
-                new_ticker = self.requirements.get("ticker")
-                if old_ticker and new_ticker and old_ticker != new_ticker and old_ticker in strategy:
-                    self.requirements["strategy"] = strategy.replace(old_ticker, new_ticker)
-                
-                # If capital changed, replace old capital with new capital in strategy
-                new_capital = self.requirements.get("capital")
-                if old_capital and new_capital and old_capital != new_capital and old_capital in strategy:
-                    self.requirements["strategy"] = strategy.replace(old_capital, new_capital)
-            
-            return "Got it! Let me update that for you.\n\n" + self._phase1_understanding(user_input)
-        
-        # Check for explanation request
-        if "explain" in user_lower:
-            return f"""📝 DETAILED IMPLEMENTATION APPROACH:
-
-🎯 STRATEGY BREAKDOWN:
-{self.requirements.get('strategy', 'Your trading strategy')}
-
-🔧 TECHNICAL IMPLEMENTATION:
-1. **Data Setup**: Fetch OHLCV data for {self.requirements.get('ticker', 'ticker')} using yfinance
-2. **Indicators**: Calculate RSI, daily returns, and any other required indicators
-3. **Entry Logic**: Implement buy conditions (price drops + RSI threshold)
-4. **Exit Logic**: Implement sell conditions (profit target, time limit, stop loss)
-5. **Position Sizing**: Use {self.requirements.get('capital', 'specified capital')} for position calculation
-6. **Backtesting**: Run simulation using backtesting.py library
-7. **Analysis**: Generate performance metrics and statistics
-
-💻 CODE STRUCTURE:
-- Custom Strategy class inheriting from backtesting.Strategy
-- init() method for indicator setup
-- next() method for trading logic implementation
-- Proper risk management and position sizing
-
-🤔 Ready to proceed with this approach?
-• Type "yes" or "go" to start implementation
-• Type "change [aspect]" to modify requirements"""
-        
-        # Handle "no" explicitly
-        if user_lower == "no":
-            return f"""I understand you're not ready to proceed yet. 
-
-📋 CURRENT PLAN:
-• Ticker: {self.requirements.get('ticker', '?')}
-• Period: {self.requirements.get('period', '?')}
-• Capital: {self.requirements.get('capital', '?')}
-• Strategy: {self.requirements.get('strategy', '?')}
-
-What would you like to do?
-• "change [requirement]" → Modify something (e.g., "change period to 2020-2023")
-• "explain" → See more details about the implementation
-• Or just tell me what's wrong and I'll help!"""
-        
-        # Default response for unclear input
-        return f"""🤔 I need your confirmation to proceed.
-
-📋 CURRENT PLAN:
-• Ticker: {self.requirements.get('ticker', '?')}
-• Period: {self.requirements.get('period', '?')}
-• Capital: {self.requirements.get('capital', '?')}
-• Strategy: {self.requirements.get('strategy', '?')}
-
-Please choose:
-• "yes" or "go" → Start implementation
-• "change [requirement]" → Modify something
-• "explain" → More details about implementation approach"""
+        # Everything else goes back to understanding phase
+        # The understanding phase LLM is smart enough to handle:
+        # - "change ticker to TSLA" 
+        # - "explain how RSI works"
+        # - "actually use 2023 instead"
+        # - "reset everything"
+        # - "what does this strategy do?"
+        self.phase = "understanding"
+        return "Got it! Let me help you with that.\n\n" + self._phase1_understanding(user_input, from_confirmation=True)
     
     def _phase2_implementation(self, attempt: int = 1) -> str:
         """Phase 2: Producer generates, Critic evaluates."""
         if attempt > 3:
             if self.debug_logger:
                 self.debug_logger.info(f"Failed after 3 attempts. Last error: {self.last_error}")
-            return f"❌ Failed after 3 attempts.\n\nLast error:\n{self.last_error}"
+            
+            # Return to understanding phase with full context
+            self.phase = "understanding"
+            error_msg = f"❌ Failed after 3 attempts.\n\nLast error:\n{self.last_error}\n\nLet's try a different approach."
+            return error_msg + "\n\n" + self._phase1_understanding("I need help fixing this strategy", from_confirmation=True)
         
         print(f"🔄 Attempt {attempt}/3 - Generating/Testing/Executing...")
         if self.debug_logger:
@@ -1091,34 +1019,76 @@ Write in markdown format:"""
             self.agent_logger.info(self.results)
             self.agent_logger.info("")
 
-        # Try saving a simple PDF with matplotlib PdfPages (equity chart + text page)
+        # Convert markdown to PDF
         try:
-            import matplotlib.pyplot as plt  # type: ignore
-            from matplotlib.backends.backend_pdf import PdfPages  # type: ignore
+            # Try using pandoc first (best quality)
+            import subprocess
             pdf_path = os.path.join(run_dir, 'report.pdf')
-            with PdfPages(pdf_path) as pdf:
-                # Page 1: Title
-                plt.figure(figsize=(8.27, 11.69))
-                plt.axis('off')
-                plt.text(0.5, 0.9, 'NLBT Backtest Report', ha='center', va='center', fontsize=18)
-                plt.text(0.1, 0.8, self._format_requirements(), ha='left', va='top', fontsize=10, family='monospace')
-                pdf.savefig(); plt.close()
-                # Page 2: Equity
-                if equity_png:
-                    img = plt.imread(equity_png)
+            result = subprocess.run([
+                'pandoc', md_path, '-o', pdf_path,
+                '--pdf-engine=xelatex',
+                '--variable', 'geometry:margin=1in'
+            ], capture_output=True, text=True, timeout=30)
+            
+            if result.returncode != 0:
+                raise Exception(f"Pandoc failed: {result.stderr}")
+                
+        except (FileNotFoundError, subprocess.TimeoutExpired, Exception):
+            # Fallback: Try weasyprint
+            try:
+                import weasyprint
+                from markdown import markdown
+                
+                # Convert markdown to HTML first
+                with open(md_path, 'r') as f:
+                    md_content = f.read()
+                
+                html_content = f"""
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="UTF-8">
+                    <style>
+                        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; 
+                              line-height: 1.6; max-width: 800px; margin: 0 auto; padding: 20px; }}
+                        h1 {{ color: #2c3e50; border-bottom: 2px solid #3498db; }}
+                        h2 {{ color: #34495e; margin-top: 30px; }}
+                        table {{ border-collapse: collapse; width: 100%; margin: 20px 0; }}
+                        th, td {{ border: 1px solid #ddd; padding: 8px; text-align: left; }}
+                        th {{ background-color: #f2f2f2; }}
+                        code {{ background-color: #f8f9fa; padding: 2px 4px; border-radius: 3px; }}
+                        pre {{ background-color: #f8f9fa; padding: 15px; border-radius: 5px; overflow-x: auto; }}
+                    </style>
+                </head>
+                <body>
+                {markdown(md_content, extensions=['tables', 'fenced_code'])}
+                </body>
+                </html>
+                """
+                
+                pdf_path = os.path.join(run_dir, 'report.pdf')
+                weasyprint.HTML(string=html_content).write_pdf(pdf_path)
+                
+            except ImportError:
+                # Final fallback: Simple matplotlib PDF (current implementation)
+                import matplotlib.pyplot as plt
+                from matplotlib.backends.backend_pdf import PdfPages
+                
+                pdf_path = os.path.join(run_dir, 'report.pdf')
+                with PdfPages(pdf_path) as pdf:
+                    # Page 1: Title and summary
                     plt.figure(figsize=(8.27, 11.69))
                     plt.axis('off')
-                    plt.imshow(img)
-                    pdf.savefig(); plt.close()
-                # Page 3: Trades (text block)
-                if trades_table_md:
-                    plt.figure(figsize=(8.27, 11.69))
-                    plt.axis('off')
-                    plt.text(0.05, 0.95, 'Trades (first 20)', ha='left', va='top', fontsize=12)
-                    plt.text(0.05, 0.9, trades_table_md, ha='left', va='top', fontsize=7, family='monospace')
-                    pdf.savefig(); plt.close()
-        except Exception:
-            pass
+                    plt.text(0.5, 0.95, 'NLBT Backtest Report', ha='center', va='top', fontsize=18, weight='bold')
+                    
+                    # Add the report content as text (first 2000 chars)
+                    with open(md_path, 'r') as f:
+                        content = f.read()[:2000] + "..." if len(f.read()) > 2000 else f.read()
+                    
+                    plt.text(0.05, 0.85, content, ha='left', va='top', fontsize=8, 
+                            family='monospace', wrap=True)
+                    pdf.savefig()
+                    plt.close()
         
         self.phase = "complete"
         return f"""🎉 COMPLETE! All 3 phases finished successfully.
@@ -1782,6 +1752,8 @@ dependencies = [
     "python-dotenv",
     "rich",
     "matplotlib",
+    "markdown",
+    "weasyprint",
 ]
 
 [project.scripts]
@@ -1792,34 +1764,136 @@ nlbt = "nlbt.cli:main"
 --- README.md ---
 # NLBT — Natural Language Backtesting
 
-**Turn plain English into professional backtesting reports in minutes.**
+> **Turn plain English into professional backtesting reports in minutes.**  
+> Describe your trading strategy in natural language. Get Python code, backtest results, and professional reports. No coding required.
 
-Describe any trading strategy in natural language → Get Python code, backtest results, and a professional markdown report. No coding required.
+---
 
-**Cost**: <$0.50 per strategy with OpenRouter  
-**Time**: 2-3 minutes per strategy  
-**Output**: Professional reports with metrics, code, and insights
+## 🚀 Quick Start
 
-## ⚠️ Safety Warning
-**This tool runs AI-generated Python code locally. Use in trusted environments only.**
+```bash
+# 1. Install
+git clone https://github.com/yourusername/nlbt && cd nlbt
+pip install -e .
 
-## What You Get
+# 2. Configure LLM
+llm keys set openrouter
+llm models default openrouter/anthropic/claude-3.5-sonnet
 
-**Input**: "Buy and hold AAPL in 2024 with $10,000"  
-**Output**: Professional report with:
-- 📊 Performance metrics (Return %, Sharpe Ratio, Max Drawdown)
-- 📈 Full backtest results and trade analysis  
-- 💻 Complete Python code for reproducibility
-- 📄 Markdown + PDF report ready to share
+# 3. Run
+nlbt
+```
 
-**Sample outputs**: See `reports/EXAMPLE_simple_buy_hold_AAPL_2024.md` and `reports/EXAMPLE_RSI_strategy_NVDA_2023.md`
+**Try it**: Type `"Buy and hold AAPL in 2024 with $10,000"` and press enter.
 
-## Status & Limitations
-- ✅ **Functional**: Successfully generates backtests for single-ticker strategies
-- ⚠️ **WIP**: APIs, prompts, and behavior may change without notice  
-- 🔄 **Active Development**: Expect bugs; contributions and test reports welcome
-- 📈 **Best Results**: Works best with clear, specific strategy descriptions
-- 🎯 **Single Asset**: Multi-asset portfolio strategies not yet supported
+---
+
+## ✨ Key Benefits
+
+| Feature | Benefit |
+|---------|---------|
+| 💬 **Natural Language** | Describe strategies in plain English - no coding needed |
+| 🤖 **AI-Powered** | Uses Claude 3.5 Sonnet for robust code generation |
+| ⚡ **Fast** | Get results in 2-3 minutes, costs <$0.10 per strategy |
+| 🔄 **Self-Correcting** | Auto-retries up to 3 times with error recovery |
+| 📊 **Professional Reports** | Markdown + PDF with metrics, charts, and full code |
+| 🔧 **Three-Tier Output** | User reports, developer code, agent checkpoints |
+
+---
+
+## 📥 What You Get
+
+### Input → Output
+
+**You type:**
+```
+"Buy and hold AAPL in 2024 with $10000"
+```
+
+**You get** (in `reports/AAPL_2024_<timestamp>/`):
+
+> 📁 **See actual example**: [`reports/EXAMPLE_AAPL_2024/`](reports/EXAMPLE_AAPL_2024/)  
+> 📄 **View report**: [`report.md`](reports/EXAMPLE_AAPL_2024/report.md) | [`report.pdf`](reports/EXAMPLE_AAPL_2024/report.pdf)  
+> 💻 **View code**: [`strategy.py`](reports/EXAMPLE_AAPL_2024/strategy.py)
+
+#### 📊 Professional Report (`report.md` / `report.pdf`)
+```markdown
+# AAPL 2024 Backtest Report
+
+## Summary
+- Test Period: 2024-01-02 to 2024-12-30 (363 days)
+- Initial Capital: $10,000
+- Final Equity: $13,887.79
+- Absolute Return: $3,887.79
+- Percentage Return: 38.88%
+
+## Performance Metrics
+- 📈 Return: 38.88%
+- 📊 Sharpe Ratio: 1.25
+- 📉 Max Drawdown: -15.26%
+- 💹 Sortino Ratio: 2.76
+- 📐 Calmar Ratio: 2.56
+- 🎯 Buy & Hold Return: 36.52%
+- 📊 Annualized Volatility: 31.29%
+- 🔢 Alpha: 2.74% | Beta: 0.99
+
+## Strategy
+- Strategy Name: MyStrategy
+- Description: Simple buy and hold - enter position when no current positions held
+- Entry Criteria: Buy when not in position
+- Exit Criteria: Hold until end of period
+
+## Code
+[Full Python implementation included]
+[Detailed analysis and insights]
+[Recommendations for future testing]
+```
+
+#### 💻 Executable Code (`strategy.py`)
+```python
+# Generated by NLBT
+# - Ticker: AAPL
+# - Period: 2024
+# - Capital: $10000
+# - Strategy: Buy and hold AAPL in 2024 with $10000
+
+from backtesting import Backtest, Strategy
+
+data = get_ohlcv_data('AAPL', '2024-01-01', '2024-12-31')
+
+class MyStrategy(Strategy):
+    def init(self):
+        pass
+    
+    def next(self):
+        if not self.position:
+            self.buy()
+
+bt = Backtest(data, MyStrategy, cash=10000)
+stats = bt.run()
+print(stats)
+
+# Emit structured artifacts for reporting
+import json
+try:
+    import pandas as pd
+    print("TRADES_TABLE")
+    print(stats._trades.head(20).to_markdown(index=False))
+except Exception:
+    pass
+```
+
+#### 🔍 Debug & Agent Logs
+- `debug.log` - Execution trace for troubleshooting
+- `agent.log` - Full LLM context for iteration (~6-8K words)
+
+---
+
+## ⚠️ Important Notes
+
+- **Safety**: This tool runs AI-generated Python code locally. Use in trusted environments only.
+- **Status**: Functional for single-ticker strategies. APIs may change without notice.
+- **Limitations**: Multi-asset portfolios not yet supported. Works best with clear strategy descriptions.
 
 ## Requirements
 - Python 3.8+
@@ -1863,40 +1937,71 @@ nlbt
 - Saves report to `reports/<TICKER>_<PERIOD>_<TIMESTAMP>/report.md` (+ PDF)
 - Takes 2-3 minutes total
 
-## How it works (3-phase agentic architecture)
+---
 
-NLBT uses a **Reflection Pattern** with **Producer-Critic** loops for robust code generation:
+## 💬 Usage
+
+```bash
+nlbt                    # Start interactive session
+```
+
+**In-chat commands:**
+- `info` - Show current phase and requirements
+- `debug` - Show internal state  
+- `lucky` - Quick demo with AAPL
+- `exit` - Quit
+
+---
+
+## 🔄 How It Works
+
+NLBT uses a **3-phase agentic workflow** with automatic error recovery:
+
+### Simple Overview
+
+1. **🔍 Understanding** - Chat with AI to gather requirements (ticker, period, capital, strategy)
+2. **⚙️ Implementation** - AI generates Python code, tests it, and auto-retries if needed
+3. **📊 Reporting** - AI creates professional analysis with metrics and insights
+
+### Visual Workflow
+
+<details>
+<summary>Click to see detailed architecture diagram</summary>
+
+**Color Key:**
+- **Purple** = User actions | **Yellow** = LLM actions | **Green** = System/sandbox
+- **Orange** = Decisions | **Teal** = Phase states | **Gray** = Outputs
 
 ```mermaid
 graph TD
     Start([User describes strategy]) --> P1[Phase 1: Understanding]
-
     P1 --> Extract[Extract requirements from conversation]
-    Extract --> Check{Complete & implementable?}
+    Extract --> Check{Complete &<br/>implementable?}
+    
     Check -->|Missing/unclear| Ask[Ask clarifying questions]
     Ask --> P1
+    
     Check -->|Complete & valid| Ready[Ready to Implement]
-
     Ready --> Present[Present plan to user]
     Present --> Response{User response}
-    Response -->|Change| P1
-    Response -->|Explain| ShowPlan[Show implementation approach]
-    ShowPlan --> Ready
-    Response -->|No| Ready
+    
+    Response -->|Anything else| BackToP1[Return to understanding]
+    BackToP1 --> P1
     Response -->|Yes/Go| P2[Phase 2: Implementation]
-
+    
     P2 --> Plan[Plan: LLM creates implementation plan]
     Plan --> Code[Producer: Generate Python code]
     Code --> Test[Test: Validate syntax & imports]
     Test --> Execute[Execute: Run in sandbox]
     Execute --> Critic[Critic: Evaluate results]
-
     Critic --> Decision{Critic decision}
+    
     Decision -->|PASS| P3[Phase 3: Reporting]
     Decision -->|RETRY| Count{Attempt < 3?}
     Count -->|Yes| Plan
-    Count -->|No| Fail[Report failure]
-
+    Count -->|No| FailBack[Show error & return to understanding]
+    FailBack --> P1
+    
     P3 --> ReportPlan[Plan: Structure report]
     ReportPlan --> Write[Write: Generate markdown]
     Write --> Refine[Refine: Polish & save]
@@ -1914,58 +2019,24 @@ graph TD
     %% Assign roles
     class Start user;
     class P1,P2,P3,Ready state;
-    class Extract,Ask,ShowPlan,Plan,Code,Critic,ReportPlan,Write,Refine llm;
-    class Test,Execute system;
+    class Extract,Ask,Plan,Code,Critic,ReportPlan,Write,Refine llm;
+    class Test,Execute,Present system;
     class Check,Decision,Count decision;
     class Response userInput;
-    class Done,Fail output;
+    class Done output;
+    class BackToP1,FailBack system;
 ```
 
-**Legend:**
-- 🟣 **Purple** - User actions/input
-- 🟡 **Yellow** - LLM actions (AI reasoning/generation)  
-- 🟢 **Green** - System/sandbox (code execution)
-- 🟠 **Orange** - Automatic decisions (code logic)
-- 🔵 **Teal** - Phase states
-- ⚪ **Gray** - Final outputs
+</details>
 
-### Phase Details
+### Key Features
 
-**Phase 1 - Understanding** 🔍
-- Conversational requirement extraction using LLM
-- Gathers: Ticker, Period, Capital, Strategy description
-- Asks clarifying questions until all 4 requirements are complete
-- Transitions to "ready" state for user confirmation
+- **Smart Confirmation**: Say "yes" to proceed, anything else returns to conversation
+- **Auto-Retry**: Up to 3 attempts with error feedback
+- **Error Recovery**: After failures, returns to chat with error context
+- **Producer-Critic Pattern**: Separate AI for generation and evaluation (reduces bias)
 
-**Phase 2 - Implementation** ⚙️ (Producer-Critic Pattern)
-1. **Plan**: LLM creates detailed implementation plan
-2. **Producer**: Strong model (Claude 3.5 Sonnet) generates Python code
-3. **Test**: Validates syntax, imports, and structure
-4. **Execute**: Runs code in isolated sandbox with financial libraries
-5. **Critic**: Separate LLM evaluates results (PASS/RETRY)
-6. **Loop**: Auto-retries up to 3 times with error feedback
-
-**Phase 3 - Reporting** 📊 (Plan-Write-Refine)
-1. **Plan**: Structure report sections
-2. **Write**: Generate comprehensive markdown analysis
-3. **Refine**: Polish and save to `reports/<TICKER>_<PERIOD>_<TIMESTAMP>/`
-
-## Use
-```bash
-nlbt                    # Start interactive session
-```
-
-**In-chat commands:**
-- `info` - Show current phase and gathered requirements
-- `debug` - Show internal state for troubleshooting  
-- `lucky` - Quick demo: "Buy and hold AAPL in 2024 with $10,000"
-- `exit` - Quit
-
-### Reports output
-- Each run saves to `reports/<TICKER>_<PERIOD>_<TIMESTAMP>/`
-  - `report.md` - Markdown version
-  - `report.pdf` - PDF version (if generation succeeds)
-- Includes performance metrics, trade analysis, and full Python code
+---
 
 ## Examples (realistic conversations)
 
@@ -2036,7 +2107,12 @@ nlbt                    # Start interactive session
 💭 You: yes
 ```
 
-## Troubleshooting
+---
+
+## 🔧 Troubleshooting
+
+<details>
+<summary>Common Issues & Solutions</summary>
 
 ### "Unknown model" error
 ```bash
@@ -2067,7 +2143,10 @@ llm models default [model-name]    # Set default
 - Check `reports/` folder for any partial outputs
 - Restart with `exit` and try again
 
-## Alternative LLM Providers
+</details>
+
+<details>
+<summary>Alternative LLM Providers</summary>
 
 **OpenAI**:
 ```bash
@@ -2081,55 +2160,71 @@ llm keys set anthropic
 llm models default claude-3-5-sonnet-20241022
 ```
 
-## Project structure
-```
-src/nlbt/
-├── __init__.py
-├── cli.py              # Interactive CLI with rich formatting
-├── reflection.py       # 3-phase reflection engine (1,251 lines)
-│                       # - Phase 1: Understanding (requirement extraction)
-│                       # - Phase 2: Implementation (Producer-Critic loop)
-│                       # - Phase 3: Reporting (Plan-Write-Refine)
-├── llm.py              # Simple LLM wrapper using `llm` CLI
-├── llm/
-│   └── client.py       # Enhanced LLM client
-└── sandbox.py          # Safe code execution + get_ohlcv_data()
+</details>
 
-reports/                # Generated backtest reports
-├── <TICKER>_<PERIOD>_<TIMESTAMP>/
-│   ├── report.md       # Markdown report
-│   └── report.pdf      # PDF version (auto-generated)
-└── EXAMPLE_*.md        # Sample output reports
-
-cursor_chats/           # Development notes & architecture docs
-tests/                  # Unit and integration tests
-scripts/                # Setup and demo scripts
-```
-
-## Architecture & Design
-
-This project implements several **Agentic Design Patterns**:
-
-- **Reflection Pattern**: 3-phase autonomous workflow with LLM controlling transitions
-- **Producer-Critic Pattern**: Separate models for generation (Producer) and evaluation (Critic) to avoid confirmation bias
-- **Planning Pattern**: Phase 2 plans before coding; Phase 3 plans before writing
-- **Tool Use Pattern**: Sandbox execution, data fetching, indicator calculations
-- **Prompt Chaining**: Phase transitions chain prompts with context
-- **Error Recovery**: Auto-retry loop (max 3 attempts) with error feedback
-
-See `cursor_chats/Agentic_Design_Patterns_Complete.md` for detailed pattern documentation.
-
-## Contributing
+## 🤝 Contributing
 
 Contributions welcome! Areas of interest:
 - Multi-asset portfolio backtesting
-- Additional technical indicators
+- Additional technical indicators  
 - Parameter optimization
 - Risk management strategies
 - Interactive visualizations
 
-## License
-MIT License. See `LICENSE`.
+See issues or open a PR!
+
+---
+
+## 📄 License
+
+GPL-3.0 License. See `LICENSE`.
+
+This is copyleft software - any derivative works must also be open source under GPL-3.0.
+
+---
+
+## 🏗️ Technical Details
+
+<details>
+<summary>Project Structure</summary>
+
+```
+src/nlbt/
+├── cli.py              # Interactive CLI with rich formatting
+├── reflection.py       # 3-phase reflection engine
+├── llm.py              # LLM wrapper using `llm` CLI
+└── sandbox.py          # Safe code execution
+
+reports/                # Generated backtest reports
+├── <TICKER>_<PERIOD>_<TIMESTAMP>/
+│   ├── report.md       # User: Professional report
+│   ├── report.pdf      # User: PDF version
+│   ├── strategy.py     # Developer: Executable code
+│   ├── debug.log       # Developer: Execution trace
+│   └── agent.log       # Agent: Full LLM context
+└── EXAMPLE_*/          # Sample outputs
+
+tests/                  # Unit and integration tests
+```
+
+</details>
+
+<details>
+<summary>Architecture & Design Patterns</summary>
+
+This project implements several **Agentic Design Patterns**:
+
+- **Reflection Pattern**: 3-phase autonomous workflow with LLM controlling transitions
+- **Producer-Critic Pattern**: Separate models for generation and evaluation (avoids confirmation bias)
+- **Planning Pattern**: Phase 2 plans before coding; Phase 3 plans before writing
+- **Tool Use Pattern**: Sandbox execution, data fetching, indicator calculations
+- **Prompt Chaining**: Phase transitions chain prompts with context
+- **Error Recovery**: Auto-retry loop (max 3 attempts) with error feedback
+- **Checkpoint Pattern**: Three-tier output (user/developer/agent) for reproducibility
+
+See `cursor_chats/Agentic_Design_Patterns_Complete.md` for detailed documentation.
+
+</details>
 
 === CONVERSATION ===
 User: Buy and hold AAPL in 2024 with $10000
@@ -2195,17 +2290,17 @@ Exposure Time [%]                         0.0
 Equity Final [$]                   13887.7882
 Equity Peak [$]                   14261.56093
 Return [%]                           38.87788
-Buy & Hold Return [%]                 36.5199
+Buy & Hold Return [%]                36.51989
 Return (Ann.) [%]                    39.05972
-Volatility (Ann.) [%]                31.28992
+Volatility (Ann.) [%]                31.28991
 CAGR [%]                              25.6082
 Sharpe Ratio                          1.24832
 Sortino Ratio                         2.76419
-Calmar Ratio                          2.55956
-Alpha [%]                             2.74258
+Calmar Ratio                          2.55955
+Alpha [%]                             2.74259
 Beta                                  0.98947
-Max. Drawdown [%]                   -15.26035
-Avg. Drawdown [%]                    -3.39719
+Max. Drawdown [%]                   -15.26037
+Avg. Drawdown [%]                     -3.3972
 Max. Drawdown Duration      134 days 00:00:00
 Avg. Drawdown Duration       22 days 00:00:00
 # Trades                                    0
@@ -2236,252 +2331,252 @@ Equity,DrawdownPct,DrawdownDuration
 10000.0,0.0,
 9986.91134960598,0.001308865039401974,
 9947.097277950706,0.0052902722049293915,
-10185.97499401516,0.0,5 days
-10163.068957638206,0.0022487819173335755,
-10220.334887813988,0.0,2 days
-10187.611499142113,0.0032017922143522393,
-10205.608859371605,0.0014408557649066012,
-10080.71750194973,0.013660744720872864,
-10028.905749630394,0.018730221688903814,
-10353.40793163723,0.0,8 days
-10513.204684566917,0.0,
-10640.279727291527,0.0,
-10710.632663082542,0.0,
-10673.547778438988,0.0034624364227688886,
-10655.549578976097,0.00514284130911391,
-10560.106921505394,0.014053860898057047,
-10522.476535152855,0.017567228178614003,
-10321.23004467434,0.03635664023381158,
-10122.70854504055,0.05489163306556588,
-10256.875109981956,0.04236514941499203,
-10201.791186642113,0.04750806907927174,
-10301.597018551292,0.03818968098318931,
-10389.948153805199,0.029940762545491828,
-10395.947833370628,0.02938060146498822,
-10336.49989635891,0.034930967991573025,
-10378.54968578762,0.03100498240776639,
-10285.715365719261,0.03967247414131647,
-10170.493655514183,0.05043016827849145,
-10121.891131710472,0.05496795099708229,
-10106.053958248558,0.05644659133142049,
-10021.413913082542,0.06434902322582703,
-9980.456805538597,0.06817299038372582,
-10021.960254024925,0.06429801401287305,
-10133.906436275902,0.05384614008792432,
-10032.881198238792,0.06327837823995464,
-9958.614917110863,0.07021226192956254,
-10038.888430904808,0.0627175119629586,
-9972.81222851223,0.06888672758925207,
-9936.225848507347,0.07230262104351914,
-9876.704058956566,0.0778598828246968,
-9627.690921139183,0.10110903585332054,
-9355.7432130093,0.12649947885368917,
-9301.135974239769,0.13159789278377865,
-9294.583239864769,0.13220968991856274,
-9389.054065060081,0.12338940561164835,
-9499.362902950706,0.11309040261522985,
-9525.574679684105,0.11064313572092721,
-9410.897631954613,0.12134997735547992,
-9513.01387340969,0.11181587748787325,
-9492.263827633324,0.11375320896296803,
-9552.331958126488,0.1081449379688364,
-9681.206317257347,0.09611256199397322,
-9822.64148266262,0.0829074442521639,
-9424.003100704613,0.1201263830859115,
-9473.696627926292,0.1154867386517443,
-9395.60763866848,0.12277753012169834,
-9333.354983639183,0.12858975961247987,
-9529.942889522972,0.110235297082793,
-9430.010333370628,0.11956551680891536,
-9350.829501461449,0.12695824834961145,
-9285.845980953636,0.13302544554999707,
-9330.077777218285,0.12889573653503783,
-9284.754138302269,0.1331273856207391,
-9326.2559083218,0.12925256596021806,
-9264.548755001488,0.13501386459321152,
-9331.171298336449,0.12879363975396407,
-9227.960696529808,0.1384299147578102,
-9624.414553951683,0.1014149344207127,
-9706.87343151516,0.09371614760229285,
-9496.086535763206,0.1133963011826219,
-9315.333285641136,0.13027235844346807,
-9239.97516186184,0.13730818220381813,
-9187.550769161644,0.1422027943475892,
-9076.152606319847,0.15260350234925235,
-9122.021746944847,0.1483209224057629,
-9179.906192135277,0.14291653155311546,
-9295.675082516136,0.1321077498478207,
-9343.184085201683,0.1276720639103036,
-9310.965075802269,0.13068019708160228,
-9540.318332027855,0.10926659216766277,
-9367.211337398949,0.12542875551265098,
-9310.965075802269,0.13068019708160228,
-9514.65289623684,0.11166284984901143,
-10079.843859981956,0.05889370151539153,
-9988.649401974144,0.06740808725491387,
-10026.327624630394,0.06389025372990464,
-10044.896502804222,0.062156567330796664,
-10144.827380489769,0.05282650431500591,
-10075.382495235863,0.059310237576932545,
-10252.003360104027,0.042820001152622966,
-10314.887957882347,0.03694877022197296,
-10440.109973263206,0.025257395928792725,
-10446.67193920559,0.024644736887184493,
-10448.310962032738,0.024491709248322557,
-10512.289080929222,0.018518381536598794,
-10583.923526119652,0.01183021964702724,
-10504.633593868675,0.019233137359280894,
-10284.81318981594,0.03975670594458136,
-10454.327426266136,0.023929981064502392,
-10454.874606441917,0.023878893496382614,
-10471.278262447777,0.022347363425110567,
-10525.95935375637,0.01724205424042824,
-10578.454242062035,0.012340860262727626,
-10675.788531612816,0.00325322813000839,
-10693.286547970238,0.0016195229224967855,
+10185.974154781761,0.0,5 days
+10163.068957638206,0.0022486997115344076,
+10220.33404858059,0.0,2 days
+10187.612338375511,0.003201628249090649,
+10205.609698605003,0.0014406916550473436,
+10080.716662716331,0.013660745842612454,
+10028.904910396996,0.018730223226918863,
+10353.409610104027,0.0,8 days
+10513.205523800316,0.0,
+10640.278888058128,0.0,
+10710.63350231594,0.0,
+10673.547778438988,0.003462514506628822,
+10655.550418209496,0.005142840906145696,
+10560.106921505394,0.01405393815202427,
+10522.475695919456,0.017567383512450463,
+10321.23004467434,0.03635671574024091,
+10122.711062740746,0.05489147205420386,
+10256.876788448753,0.04236506774030435,
+10201.792025875511,0.047508065356769436,
+10301.596179317894,0.038189834701150116,
+10389.948993038597,0.029940760199478667,
+10395.948672604027,0.029380599162866505,
+10336.501574825706,0.03493088689939172,
+10378.54968578762,0.031005058333525737,
+10285.71620495266,0.03967247103277338,
+10170.492816280785,0.050430321037346904,
+10121.891131710472,0.05496802504521936,
+10106.055636715355,0.05644650855337918,
+10021.413073849144,0.06434917489406844,
+9980.456805538597,0.06817306339717988,
+10021.960254024925,0.06429808732995157,
+10133.904757809105,0.05384637093428046,
+10032.881198238792,0.06327845163692691,
+9958.614917110863,0.0702123347832293,
+10038.886752438011,0.062717742114197,
+9972.81222851223,0.0688868005467812,
+9936.225848507347,0.07230269373339537,
+9876.703219723167,0.0778600334342926,
+9627.691760372581,0.10110902793090593,
+9355.744052242699,0.1264994689418023,
+9301.135974239769,0.13159796082756436,
+9294.583239864769,0.13220975791441114,
+9389.05490429348,0.12338939594345177,
+9499.362063717308,0.1130905504643327,
+9525.573001217308,0.1106433621169457,
+9410.89931042141,0.12134988949192338,
+9513.01387340969,0.11181594708168208,
+9492.263827633324,0.11375327840497684,
+9552.331958126488,0.10814500785028225,
+9681.207156490746,0.09611255446305811,
+9822.640643429222,0.08290759446625728,
+9424.003100704613,0.12012645202854921,
+9473.696627926292,0.11548680795792221,
+9395.60763866848,0.122777598856605,
+9333.354144405785,0.12858990624712807,
+9529.942050289574,0.11023544515560801,
+9430.010333370628,0.11956558579549992,
+9350.829501461449,0.12695831675693736,
+9285.845980953636,0.1330255134819267,
+9330.077777218285,0.12889580479055152,
+9284.754138302269,0.13312745354468125,
+9326.2559083218,0.12925263418777233,
+9264.54791576809,0.13501401072449792,
+9331.169619869652,0.12879386472779697,
+9227.961535763206,0.1384299039111122,
+9624.413714718285,0.10141508318464865,
+9706.87343151516,0.0937162186143089,
+9496.085696529808,0.11339644900775603,
+9315.334124874535,0.13027234823595668,
+9239.976001095238,0.1373081714450135,
+9187.551608395042,0.14220278320526658,
+9076.15092785305,0.1526037254574596,
+9122.021746944847,0.148320989139213,
+9179.906192135277,0.1429165987100275,
+9295.675082516136,0.1321078178516566,
+9343.184085201683,0.12767213226169827,
+9310.965075802269,0.13068026519729425,
+9540.318332027855,0.10926666196122115,
+9367.211337398949,0.12542882403982047,
+9310.965075802269,0.13068026519729425,
+9514.65289623684,0.11166291945481066,
+10079.843020748558,0.058893853611085456,
+9988.648562740746,0.0674082386834618,
+10026.328463863792,0.06389024872377369,
+10044.894824337425,0.06215679752598802,
+10144.827380489769,0.05282657853093642,
+10075.380816769066,0.0593104679951485,
+10252.003360104027,0.04282007615261463,
+10314.888797115746,0.036948767326846155,
+10440.109973263206,0.02525747230490516,
+10446.67193920559,0.02464481331130186,
+10448.312640499535,0.024491628974111057,
+10512.289080929222,0.018518458440747843,
+10583.923526119652,0.011830297075228202,
+10504.634433102074,0.01923313585226538,
+10284.81318981594,0.03975678118459802,
+10454.327426266136,0.023930057544624628,
+10454.874606441917,0.023878969980507758,
+10471.278262447777,0.022347440029239052,
+10525.961032223167,0.01724197453426468,
+10578.455920528831,0.012340780940597873,
+10675.788531612816,0.0032533062302608773,
+10693.287387203636,0.001619522795598738,
 10776.40338451809,0.0,134 days
-10700.3965333218,0.007053081485932866,
+10700.394854855003,0.007053237239827537,
 10832.179675411644,0.0,2 days
-10626.02870495266,0.019031347026760792,
-11393.215594601097,0.0,4 days
-11716.932254146996,0.0,
-11780.909533810081,0.0,
-11685.216784786644,0.008122696193261558,
+10626.027026485863,0.01903150197865855,
+11393.214755367699,0.0,4 days
+11716.933932613792,0.0,
+11780.911212276878,0.0,
+11685.216784786644,0.008122837509420444,
 11913.787036251488,0.0,4 days
-11783.645434688988,0.010923613219415707,
-11531.559863399925,0.032082760224646845,
+11783.64375622219,0.010923754103820627,
+11531.560702633324,0.03208268978244444,
 11411.807971310081,0.042134298977644535,
 11447.350344967308,0.03915100126138715,
 11498.206210445824,0.034882344676896326,
-11726.77478344387,0.01569712906891596,
-11773.254885982933,0.011795758128036127,
-11582.960391354027,0.027768386650761423,
-11918.16279919094,0.0,14 days
-12110.643496822777,0.0,
+11726.775622677269,0.015697058626713445,
+11773.255725216331,0.011795687685833611,
+11582.961230587425,0.02776831620855902,
+11918.161959957542,0.0,14 days
+12110.642657589378,0.0,
 12180.635562252464,0.0,
-12442.561984371605,0.0,
-12523.491778683128,0.0,
-12570.516543697777,0.0,
-12805.648761105003,0.0,
-12509.820666622581,0.02310137502607046,
-12672.224917721214,0.010419139699430313,
+12442.561145138206,0.0,
+12523.49093944973,0.0,
+12570.517382931175,0.0,
+12805.649600338402,0.0,
+12509.82150585598,0.023101373512094514,
+12672.224917721214,0.01041920455278278,
 12883.297992062035,0.0,5 days
 12906.265292477074,0.0,
 12581.454272579613,0.025166925716829214,
-12324.44911510891,0.04508013466198457,
-12331.556582760277,0.04452943564175671,
-12312.418704342308,0.046012271921987535,
+12324.448275875511,0.04508019968725563,
+12331.557421993675,0.044529370616485764,
+12312.419543575706,0.04601220689671659,
 12369.834018063011,0.041563633030753055,
 12016.042590450706,0.0689760114062794,
-11958.627276730003,0.07342465029751388,
+11958.626437496605,0.07342471532278494,
 11984.327960323753,0.07143331639794415,
-11999.638934444847,0.07024699535354273,
-12030.259204220238,0.06787448331528179,
-12209.617648434105,0.05397747746972448,
+11999.639773678246,0.07024693032827167,
+12030.260043453636,0.06787441829001084,
+12209.616809200706,0.053977542494995534,
 12006.200061153831,0.06973862778474582,
 12088.22253735012,0.06338338292207446,
 11509.142260860863,0.10825153520054942,
 11397.589679073753,0.11689482427443298,
-11539.217028927269,0.10592128958844838,
+11539.21618969387,0.10592135461371943,
 11730.056186031761,0.09113473803540306,
-11890.273394894066,0.07872082857116058,
-11974.582782101097,0.07218838984497278,
-12179.329715084496,0.05632423950066334,
-12203.965411495628,0.05441542267001198,
+11890.275073360863,0.07872069852061858,
+11974.581942867699,0.07218845487024383,
+12179.330554317894,0.0563241744753924,
+12203.963733028831,0.054415552720553984,
 12368.200869869652,0.041690172208148746,
-12441.011081051292,0.0360487097454113,
+12441.01192028469,0.036048644720140244,
 12432.252841305199,0.03672731347372593,
 12466.193957638206,0.03409749643805793,
-12460.171618771019,0.03456411778286306,
-12357.798571896019,0.04249616044238225,
+12460.172458004417,0.034564052757592,
+12357.79773266262,0.04249622546765319,
 12484.26013500637,0.032697697428913486,
-12502.872653316917,0.0312555669683382,
+12502.873492550316,0.03125550194306714,
 12549.407306026878,0.027649980715815925,
 12465.099597286644,0.03418228939146173,
-12645.75801403469,0.020184559401101865,
+12645.75885326809,0.020184494375830808,
 12602.509799313011,0.023535506692328623,
 12261.447863888206,0.04996158175709631,
-12156.336398434105,0.05810580187593806,
-12240.096926998558,0.05161588967699415,
+12156.337237667503,0.058105736850667,
+12240.097766231956,0.05161582465172321,
 12154.694018673363,0.058233056331314814,
-12159.621997188988,0.057851227939913485,
-12115.824084591331,0.0612447667836552,
-12255.425525021019,0.050428203101901437,
+12159.62115795559,0.05785129296518454,
+12115.82492382473,0.06124470175838426,
+12255.426364254417,0.05042813807663038,
 12261.447863888206,0.04996158175709631,
-12246.666446041527,0.051106871855487124,
-11908.341250729027,0.07732089951147414,
+12246.665606808128,0.05110693688075818,
+11908.340411495628,0.0773209645367452,
 11934.070468258324,0.07532735475268992,
 12147.577319454613,0.058784470629523855,
 12595.393100094261,0.024086920990537553,
 12558.713565182152,0.026928915485528226,
-12464.004397701683,0.034267147370136586,
-12513.27495129055,0.0304495787341047,
+12464.005236935081,0.03426708234486553,
+12513.274112057152,0.030449643759375755,
 12458.529239010277,0.034691372238239815,
 12521.486850094261,0.02981330645722091,
 12536.267428707542,0.02866808138410104,
-12821.490969967308,0.006568462726330271,
-12449.770999264183,0.03536997596655456,
+12821.49013073391,0.006568527751601327,
+12449.771838497581,0.0353699109412835,
 12480.976214718285,0.032952141314396055,
 12420.208163570824,0.03766055616333619,
-12482.070575069847,0.032867348360992144,
+12482.069735836449,0.0328674133862632,
 12202.323031734886,0.05454267712538874,
 12425.68332226223,0.03723633129523296,
 12632.07263500637,0.02124492649554688,
 12604.699359249535,0.023365855760249965,
 12523.130069088402,0.029685986976573098,
 12728.424182247581,0.013779440155561762,
-12868.02478344387,0.0029629414990789416,
-12754.701419186058,0.011743433894804589,
+12868.023944210472,0.002963006524349998,
+12754.702258419456,0.011743368869533644,
 12774.957156490746,0.010173983953581489,
 12930.980716061058,0.0,94 days
 13012.003665279808,0.0,
-12978.061709713402,0.0026085110671290046,
-12698.861346554222,0.024065649440381698,
-12688.459887813988,0.024865023542003706,
+12978.0625489468,0.0026084465702675974,
+12698.860507320824,0.024065713937243216,
+12688.460727047386,0.024864959045142188,
 12734.446521114769,0.021330853518405468,
-12843.38824779934,0.012958451428229156,
-12858.169665646019,0.01182246820635835,
+12843.389087032738,0.012958386931367638,
+12858.170504879417,0.011822403709496832,
 12662.729831051292,0.02684243281920451,
-12433.346362423363,0.04447103749290271,
+12433.347201656761,0.04447097299604119,
 12269.111743282738,0.05709281530402144,
-12219.84118969387,0.06087936154672935,
+12219.840350460472,0.06087942604359087,
 12298.673739742699,0.05482091335714134,
-12258.710284542503,0.057892189405643446,
+12258.709445309105,0.05789225390250485,
 12519.297290157738,0.03786552692394085,
 12504.499926876488,0.039002735586180504,
 12354.880557369652,0.05050130055400859,
 12354.880557369652,0.05050130055400859,
 12403.65680248684,0.04675274296273313,
 12573.55456860012,0.03369574033010847,
-12397.081408810081,0.04725807587270636,
-12562.594180416527,0.03453806934149961,
+12397.080569576683,0.04725814036956788,
+12562.59250194973,0.03453819833522265,
 12576.842685055199,0.033443041626691095,
 12616.302600216331,0.030410463695098255,
-12589.996829342308,0.032432117819298556,
-12663.983645748558,0.026746074508100404,
+12589.99599010891,0.032432182316160074,
+12663.98280651516,0.026746139004961922,
 12828.399539303246,0.014110365374894296,
 12948.423343014183,0.004886282228407146,
 12941.298251461449,0.0054338605826729225,
-13072.832141231956,0.0,39 days
+13072.831301998558,0.0,39 days
 13196.692080807152,0.0,
 13364.396930050316,0.0,
-13384.126468014183,0.0,
-13385.77136547512,0.0,
-13374.810138058128,0.0008188715553041348,
+13384.127307247581,0.0,
+13385.770526241722,0.0,
+13374.80929882473,0.0008188716066440671,
 13589.099154781761,0.0,4 days
 13645.001330685081,0.0,
 13574.85065014309,0.005141126691152187,
 13655.414538692894,0.0,2 days
-13664.731707882347,0.0,
-13824.21374828762,0.0,
+13664.730868648949,0.0,
+13824.214587521019,0.0,
 13957.939715694847,0.0,
 13660.346713375511,0.021320696920958282,
-13755.707125973167,0.014488713509364204,
-14013.29303295559,0.0,3 days
-14056.041903805199,0.0,
-14216.621661495628,0.0,
+13755.707965206566,0.014488653383484928,
+14013.294711422386,0.0,3 days
+14056.042743038597,0.0,
+14216.623339962425,0.0,
 14261.56093151516,0.0,
-14073.578524898949,0.013181054129973058,
+14073.579364132347,0.013180995284142516,
 13887.788195919456,0.026208402950461118,4 days
 
 SUMMARY_JSON
