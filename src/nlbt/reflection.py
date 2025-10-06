@@ -306,7 +306,7 @@ try:
     # Trades preview table
     import pandas as pd
     print("TRADES_TABLE")
-    print(stats._trades.head(20).to_markdown(index=False))
+    print(stats._trades.head(50).to_markdown(index=False))
 except Exception:
     pass
 
@@ -886,8 +886,8 @@ If results are shown and requirements met, say PROCEED."""
                 from io import StringIO
                 tr_df = pd.read_csv(StringIO(trades_csv))
                 # Build a compact markdown table of first 20 trades
-                cols = [c for c in tr_df.columns][:6]
-                head = tr_df[cols].head(20)
+                cols = [c for c in tr_df.columns]
+                head = tr_df.head(50)
                 trades_table_md = "| " + " | ".join(cols) + " |\n" + "|" + "---|"*len(cols) + "\n"
                 for _, row in head.iterrows():
                     trades_table_md += "| " + " | ".join(str(row[c]) for c in cols) + " |\n"
@@ -912,6 +912,7 @@ Create outline with sections:
         plan = self.llm.ask(plan_prompt)
         
         # Write
+        selected_language = (self.requirements.get('lang') or 'English').strip()
         write_prompt = f"""Write a professional backtest report following this plan:
 
 Plan:
@@ -935,6 +936,7 @@ CRITICAL INSTRUCTIONS:
 - Focus on concrete metrics and clear analysis
 - Use bullet points and tables for readability
 - Keep sections concise and informative
+ - Use this language for the entire report body: {selected_language}
 
 Write the complete report now:"""
 
@@ -945,44 +947,17 @@ Write the complete report now:"""
         period = self.requirements.get('period', 'Unknown')
         strategy_desc = self.requirements.get('strategy', 'Strategy')
         
-        # Create a clean title
-        if 'buy and hold' in strategy_desc.lower():
-            title = f"{ticker} {period} Buy & Hold Strategy"
-        else:
-            title = f"{ticker} {period} Trading Strategy"
+        # Create a clean title (generic, no special-casing)
+        title = f"{ticker} {period} Trading Strategy"
         
-        # Localize summary header if requested
-        lang = (self.requirements.get('lang') or 'en').lower()
-        if lang.startswith('hi'):
-            summary_title = 'सारांश'
-        elif lang.startswith('gu'):
-            summary_title = 'સારાંશ'
-        else:
-            summary_title = title
+        # Title (no hardcoded localization; full body uses selected language)
+        summary_title = title
 
-        # Compute TL;DR via LLM and inject at top of report; if summary_json exists, prioritize its fields
-        if summary_json:
-            try:
-                import json as _json
-                sj = _json.loads(summary_json)
-                initial = float(sj.get('initial', 0))
-                equity_final = float(sj.get('equity_final', 0))
-                pnl_abs = equity_final - initial
-                pnl_pct = ((equity_final - initial) / initial * 100) if initial > 0 else 0
-                
-                tldr_line = (
-                    f"Initial Capital: ${initial:,.0f} → "
-                    f"Final Equity: ${equity_final:,.2f} → "
-                    f"Gain: {'+' if pnl_abs >= 0 else ''}${pnl_abs:,.2f} "
-                    f"({'+' if pnl_pct >= 0 else ''}{pnl_pct:.2f}%)"
-                )
-            except Exception:
-                tldr_line = self._llm_tldr(self.results if isinstance(self.results, str) else str(self.results))
-        else:
-            tldr_line = self._llm_tldr(self.results if isinstance(self.results, str) else str(self.results))
+        # Compute TL;DR via LLM so it follows the selected language
+        tldr_line = self._llm_tldr(self.results if isinstance(self.results, str) else str(self.results))
         final_md = f"# {summary_title}\n\n**{tldr_line}**\n\n" + draft
         if trades_table_md:
-            final_md += "\n\n## Trades (first 20)\n\n" + trades_table_md
+            final_md += "\n\n## Trades (first 50)\n\n" + trades_table_md
         if equity_png:
             final_md += f"\n\n## Equity Curve\n\n![]({os.path.basename(equity_png)})\n"
 
@@ -1138,10 +1113,12 @@ Write the complete report now:"""
         """Produce a single-line summary: strategy, end date, cash, equity, portfolio."""
         strategy = (self.requirements.get('strategy') or '').strip()
         capital = (self.requirements.get('capital') or '').strip()
+        selected_language = (self.requirements.get('lang') or 'English').strip()
         prompt = (
             "You will receive: strategy text, initial capital, and raw backtest stats.\n"
-            "Output ONE line only, exactly in this format (no extra words):\n"
-            "Strategy: <STRATEGY> · End: <YYYY-MM-DD> · Initial: <INITIAL> · Equity: <EQUITY> · Portfolio: <PORTFOLIO>\n"
+            "Output ONE line only, exactly in this format (no extra words).\n"
+            "Write the output in this language: " + selected_language + "\n"
+            "Format: Strategy: <STRATEGY> · End: <YYYY-MM-DD> · Initial: <INITIAL> · Equity: <EQUITY> · Portfolio: <PORTFOLIO>\n"
             "Rules:\n"
             "- STRATEGY: use the given strategy text as-is (shorten only if extremely long).\n"
             "- INITIAL: echo the provided initial capital (keep currency symbol/commas if present).\n"
@@ -1193,41 +1170,13 @@ Write the complete report now:"""
         ]
 
         for pattern in ticker_patterns:
-            matches = re.findall(pattern, user_input)  # Find all, no IGNORECASE
+            matches = re.findall(pattern, user_input)
             for potential_ticker in matches:
                 potential_ticker = potential_ticker.upper()
-                # Validate it's a common ticker
-                if potential_ticker in ["AAPL", "MSFT", "GOOGL", "TSLA", "NVDA", "SPY", "QQQ", "AMZN", "META", "NFLX"] and not self.requirements.get("ticker"):
+                if not self.requirements.get("ticker"):
                     self.requirements["ticker"] = potential_ticker
                     break
             if self.requirements.get("ticker"):
-                break
-
-        # Also check for company names and map to tickers (incl. India aliases)
-        company_to_ticker = {
-            "amazon": "AMZN",
-            "apple": "AAPL",
-            "microsoft": "MSFT",
-            "tesla": "TSLA",
-            "nvidia": "NVDA",
-            "google": "GOOGL",
-            "meta": "META",
-            "netflix": "NFLX",
-            "spy": "SPY",
-            "qqq": "QQQ",
-            # India
-            "reliance": "RELIANCE.NS",
-            "tcs": "TCS.NS",
-            "hdfcbank": "HDFCBANK.NS",
-            "icicibank": "ICICIBANK.NS",
-            "infosys": "INFY.NS",
-            "nifty": "^NSEI",
-            "banknifty": "^NSEBANK"
-        }
-
-        for company, ticker in company_to_ticker.items():
-            if company in user_lower and not self.requirements.get("ticker"):
-                self.requirements["ticker"] = ticker
                 break
         
         # Extract periods
@@ -1257,6 +1206,16 @@ Write the complete report now:"""
                 cap = m_inr.group(1).replace(',', '')
                 cap_num = int(cap)
                 self.requirements["capital"] = f"₹{cap_num}"
+
+        # Extract language preference (e.g., "lang hi", "language: Spanish")
+        if not self.requirements.get("lang"):
+            try:
+                import re as _re2
+                m_lang = _re2.search(r'\blang(?:uage)?[:\s]+([A-Za-z\-]+)', user_input, _re2.IGNORECASE)
+                if m_lang:
+                    self.requirements["lang"] = m_lang.group(1).strip()
+            except Exception:
+                pass
         
         # Extract strategy - look for complete trading descriptions
         strategy_patterns = [

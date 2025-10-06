@@ -187,6 +187,15 @@ nlbt                    # Start interactive session
 - `lucky` - Quick demo with AAPL
 - `exit` - Quit
 
+### Language preference
+
+- **Set report language**: Include `lang <language>` or `language: <language>` anywhere in your message to generate the entire report (including the TL;DR) in that language. Defaults to English if omitted.
+
+Example:
+```bash
+💭 You: Buy and hold AAPL in 2024 with $10,000; lang Spanish
+```
+
 ---
 
 ## 🔄 How It Works
