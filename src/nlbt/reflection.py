@@ -912,7 +912,7 @@ Create outline with sections:
         plan = self.llm.ask(plan_prompt)
         
         # Write
-        write_prompt = f"""Write a professional backtest report:
+        write_prompt = f"""Write a professional backtest report following this plan:
 
 Plan:
 {plan}
@@ -923,9 +923,33 @@ Results:
 Code:
 {self.code}
 
-Write in markdown format:"""
+Requirements:
+{self._format_requirements()}
+
+CRITICAL INSTRUCTIONS:
+- Write in clean, professional markdown format
+- Use actual numbers from the results, not placeholders
+- DO NOT include placeholder URLs like "URL_to_equity_curve_image"
+- DO NOT include "WIP" or "placeholder" text
+- If equity curve data exists, just mention it without placeholder links
+- Focus on concrete metrics and clear analysis
+- Use bullet points and tables for readability
+- Keep sections concise and informative
+
+Write the complete report now:"""
 
         draft = self.llm.ask(write_prompt)
+        
+        # Create a proper title based on requirements
+        ticker = self.requirements.get('ticker', 'Unknown')
+        period = self.requirements.get('period', 'Unknown')
+        strategy_desc = self.requirements.get('strategy', 'Strategy')
+        
+        # Create a clean title
+        if 'buy and hold' in strategy_desc.lower():
+            title = f"{ticker} {period} Buy & Hold Strategy"
+        else:
+            title = f"{ticker} {period} Trading Strategy"
         
         # Localize summary header if requested
         lang = (self.requirements.get('lang') or 'en').lower()
@@ -934,18 +958,23 @@ Write in markdown format:"""
         elif lang.startswith('gu'):
             summary_title = 'સારાંશ'
         else:
-            summary_title = 'Summary'
+            summary_title = title
 
         # Compute TL;DR via LLM and inject at top of report; if summary_json exists, prioritize its fields
         if summary_json:
             try:
                 import json as _json
                 sj = _json.loads(summary_json)
+                initial = float(sj.get('initial', 0))
+                equity_final = float(sj.get('equity_final', 0))
+                pnl_abs = equity_final - initial
+                pnl_pct = ((equity_final - initial) / initial * 100) if initial > 0 else 0
+                
                 tldr_line = (
-                    f"Strategy: {sj.get('strategy','')} · End: {sj.get('end','')} "
-                    f"· Initial: {sj.get('initial','')} "
-                    f"· Equity: {sj.get('equity_final','')} "
-                    f"· Portfolio: {sj.get('portfolio_final','')}"
+                    f"Initial Capital: ${initial:,.0f} → "
+                    f"Final Equity: ${equity_final:,.2f} → "
+                    f"Gain: {'+' if pnl_abs >= 0 else ''}${pnl_abs:,.2f} "
+                    f"({'+' if pnl_pct >= 0 else ''}{pnl_pct:.2f}%)"
                 )
             except Exception:
                 tldr_line = self._llm_tldr(self.results if isinstance(self.results, str) else str(self.results))
