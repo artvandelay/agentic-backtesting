@@ -218,22 +218,10 @@ RESPOND ONLY to the current user message. Do NOT create fake conversations."""
     
     def _handle_implementation_confirmation(self, user_input: str) -> str:
         """Handle user confirmation before starting implementation."""
-        user_lower = user_input.lower().strip()
-        
-        # Check for proceed signals (whole word matching)
-        import re
-        proceed_words = ["yes", "go", "proceed", "ok", "start", "continue"]
-        proceed_pattern = r'\b(' + '|'.join(proceed_words) + r')\b'
-        
-        # Check for conflicting words that indicate it's not a simple proceed
-        conflict_words = ["but", "change", "explain", "first", "wait", "think", "over", "else"]
-        has_conflict = any(word in user_lower for word in conflict_words)
-        
-        if re.search(proceed_pattern, user_lower) and not has_conflict:
-            # Proceed if we have a proceed word AND no conflicting words
+        # Use LLM to determine if user wants to proceed
+        if self._should_proceed(user_input):
+            # Proceed with implementation
             self.phase = "implementation"
-            
-            # Immediately start implementation instead of just showing a message
             implementation_result = self._phase2_implementation()
             return implementation_result
         
@@ -871,8 +859,8 @@ If results are shown and requirements met, say PROCEED."""
             if equity_csv:
                 from io import StringIO
                 eq_df = pd.read_csv(StringIO(equity_csv))
-                # Guess equity column name
-                ycol = 'Equity' if 'Equity' in eq_df.columns else eq_df.columns[-1]
+                # Find best equity column via LLM
+                ycol = self._find_best_column(list(eq_df.columns), "equity")
                 x = eq_df.index if 'index' in eq_df.columns else range(len(eq_df))
                 plt.figure(figsize=(8,4))
                 plt.plot(eq_df[ycol])
@@ -942,24 +930,22 @@ Write the complete report now:"""
 
         draft = self.llm.ask(write_prompt)
         
-        # Create a proper title based on requirements
-        ticker = self.requirements.get('ticker', 'Unknown')
-        period = self.requirements.get('period', 'Unknown')
-        strategy_desc = self.requirements.get('strategy', 'Strategy')
-        
-        # Create a clean title (generic, no special-casing)
-        title = f"{ticker} {period} Trading Strategy"
-        
-        # Title (no hardcoded localization; full body uses selected language)
+        # Generate title via LLM (with fallback to f-string)
+        title = self._generate_title()
         summary_title = title
 
         # Compute TL;DR via LLM so it follows the selected language
         tldr_line = self._llm_tldr(self.results if isinstance(self.results, str) else str(self.results))
         final_md = f"# {summary_title}\n\n**{tldr_line}**\n\n" + draft
+        
+        # Generate section headings via LLM
+        lang = self.requirements.get('lang', 'English')
         if trades_table_md:
-            final_md += "\n\n## Trades (first 50)\n\n" + trades_table_md
+            trades_heading = self._generate_section_name("trades", lang)
+            final_md += f"\n\n## {trades_heading}\n\n" + trades_table_md
         if equity_png:
-            final_md += f"\n\n## Equity Curve\n\n![]({os.path.basename(equity_png)})\n"
+            equity_heading = self._generate_section_name("equity_curve", lang)
+            final_md += f"\n\n## {equity_heading}\n\n![]({os.path.basename(equity_png)})\n"
 
         # Save markdown and assets into run directory
         md_path = os.path.join(run_dir, 'report.md')
@@ -1136,6 +1122,112 @@ Write the complete report now:"""
             return line if line else "Summary unavailable"
         except Exception:
             return "Summary unavailable"
+    
+    def _generate_title(self) -> str:
+        """Generate report title via LLM."""
+        ticker = self.requirements.get('ticker', 'Unknown')
+        period = self.requirements.get('period', 'Unknown')
+        strategy = self.requirements.get('strategy', 'Strategy')
+        lang = self.requirements.get('lang', 'English')
+        
+        prompt = f"""Generate a concise report title (max 10 words).
+Ticker: {ticker}
+Period: {period}
+Strategy: {strategy}
+Language: {lang}
+
+Output only the title, no quotes or punctuation at end."""
+        
+        try:
+            # Use fast model (gpt-4o-mini for speed)
+            title_llm = LLM("gpt-4o-mini")
+            title = title_llm.ask(prompt).strip().strip('"\'.')
+            if title and len(title) < 100:
+                return title
+        except Exception as e:
+            pass
+        
+        # Fallback
+        return f"{ticker} {period} Trading Strategy"
+    
+    def _should_proceed(self, user_input: str) -> bool:
+        """Check if user wants to proceed with implementation via LLM."""
+        prompt = f"""User said: "{user_input}"
+
+Context: User has confirmed requirements and is being asked if they want to proceed with implementation.
+
+Does the user want to proceed? Answer ONLY with YES or NO.
+
+YES means: User agrees, confirms, wants to start (e.g., "yes", "go", "ok", "proceed", "let's do it")
+NO means: User wants to change something, ask questions, or wait (e.g., "change ticker", "explain first", "wait")
+
+Answer:"""
+        
+        try:
+            # Use fast model
+            proceed_llm = LLM("gpt-4o-mini")
+            response = proceed_llm.ask(prompt).strip().upper()
+            return "YES" in response and "NO" not in response
+        except:
+            pass
+        
+        # Fallback to simple keyword matching
+        import re
+        user_lower = user_input.lower().strip()
+        proceed_words = ["yes", "go", "proceed", "ok", "start", "continue"]
+        proceed_pattern = r'\b(' + '|'.join(proceed_words) + r')\b'
+        conflict_words = ["but", "change", "explain", "first", "wait", "think", "over", "else"]
+        has_conflict = any(word in user_lower for word in conflict_words)
+        return re.search(proceed_pattern, user_lower) and not has_conflict
+    
+    def _generate_section_name(self, section_type: str, language: str = "English") -> str:
+        """Generate section heading via LLM."""
+        prompt = f"""Generate a section heading for a financial backtest report.
+Section type: {section_type}
+Language: {language}
+
+Output only the heading text (2-4 words), no markdown ##, no punctuation at end."""
+        
+        try:
+            section_llm = LLM("gpt-4o-mini")
+            heading = section_llm.ask(prompt).strip().strip('#').strip()
+            if heading and len(heading) < 50:
+                return heading
+        except:
+            pass
+        
+        # Fallback
+        fallbacks = {
+            "trades": "Trades (first 50)",
+            "equity_curve": "Equity Curve"
+        }
+        return fallbacks.get(section_type, section_type.title())
+    
+    def _find_best_column(self, df_columns: list, target_type: str) -> str:
+        """Find best column name via LLM."""
+        columns_str = ", ".join(df_columns)
+        prompt = f"""Given these DataFrame columns: {columns_str}
+
+Which column likely contains {target_type} data? Answer with ONLY the exact column name.
+
+{target_type} typically contains values like equity, portfolio value, or account balance over time."""
+        
+        try:
+            col_llm = LLM("gpt-4o-mini")
+            response = col_llm.ask(prompt).strip().strip('"\'')
+            if response in df_columns:
+                return response
+        except:
+            pass
+        
+        # Fallback logic
+        if target_type == "equity":
+            for col in df_columns:
+                if 'equity' in col.lower():
+                    return col
+            return df_columns[-1]  # Last column as fallback
+        
+        return df_columns[0] if df_columns else "Value"
     
     def _get_history(self) -> str:
         """Get recent conversation with better context."""
