@@ -1247,8 +1247,57 @@ Which column likely contains {target_type} data? Answer with ONLY the exact colu
         
         return formatted
     
+    def _extract_requirements_llm(self, user_input: str) -> dict:
+        """Extract requirements via LLM with structured JSON output."""
+        prompt = f"""Extract trading requirements from this user message: "{user_input}"
+
+Output ONLY valid JSON with these fields (use null if not found):
+{{
+  "ticker": "stock symbol (e.g. AAPL, RELIANCE.NS, ^NSEI)",
+  "period": "time period (e.g. 2024, 2023, 2020-2024)", 
+  "capital": "initial capital with currency (e.g. $10000, ₹500000)",
+  "strategy": "trading strategy description",
+  "lang": "language preference (e.g. English, Spanish, Hindi)"
+}}
+
+Examples:
+- "Buy AAPL in 2024 with $10K" → {{"ticker": "AAPL", "period": "2024", "capital": "$10000", "strategy": "buy", "lang": null}}
+- "NVDA RSI strategy, 2023, ₹50000, lang Hindi" → {{"ticker": "NVDA", "period": "2023", "capital": "₹50000", "strategy": "RSI strategy", "lang": "Hindi"}}
+
+JSON:"""
+        
+        try:
+            extract_llm = LLM("gpt-4o-mini")
+            response = extract_llm.ask(prompt).strip()
+            
+            # Extract JSON from response
+            import json
+            if response.startswith('```'):
+                response = response.split('```')[1].strip()
+                if response.startswith('json'):
+                    response = response[4:].strip()
+            
+            data = json.loads(response)
+            return {k: v for k, v in data.items() if v is not None}
+        except:
+            return {}
+    
     def _update_requirements_from_conversation(self, user_input: str):
         """Extract requirements from natural conversation."""
+        # Try LLM extraction first
+        llm_extracted = self._extract_requirements_llm(user_input)
+        
+        # Update requirements with LLM results (only if not already set)
+        for key, value in llm_extracted.items():
+            if not self.requirements.get(key) and value:
+                self.requirements[key] = value
+        
+        # Fallback to regex parsing for any missing fields
+        if not self.requirements.get("ticker") or not self.requirements.get("period") or not self.requirements.get("capital") or not self.requirements.get("strategy"):
+            self._regex_fallback_extraction(user_input)
+    
+    def _regex_fallback_extraction(self, user_input: str):
+        """Fallback regex extraction (original logic)."""
         user_lower = user_input.lower()
         
         # Extract ticker symbols with improved logic
@@ -1310,60 +1359,61 @@ Which column likely contains {target_type} data? Answer with ONLY the exact colu
                 pass
         
         # Extract strategy - look for complete trading descriptions
-        strategy_patterns = [
-            r'buy.*?stop.*?loss.*?take.*?profit',  # Buy with stop loss and take profit
-            r'buy.*?open',  # Buy at open
-            r'sell.*?close',  # Sell at close
-            r'moving.*?average',  # Moving average strategies
-            r'rsi.*?buy.*?sell',  # RSI strategies
-            r'ema.*?buy.*?sell',  # EMA strategies
-            r'sma.*?buy.*?sell',  # SMA strategies
-        ]
+        if not self.requirements.get("strategy"):
+            strategy_patterns = [
+                r'buy.*?stop.*?loss.*?take.*?profit',  # Buy with stop loss and take profit
+                r'buy.*?open',  # Buy at open
+                r'sell.*?close',  # Sell at close
+                r'moving.*?average',  # Moving average strategies
+                r'rsi.*?buy.*?sell',  # RSI strategies
+                r'ema.*?buy.*?sell',  # EMA strategies
+                r'sma.*?buy.*?sell',  # SMA strategies
+            ]
 
-        # Also check for any mention of trading rules
-        if any(word in user_lower for word in ["buy", "sell", "stop loss", "take profit", "entry", "exit", "hold"]):
-            # Extract the full strategy description if it contains trading terms
-            words = user_input.split()
-            if len(words) >= 2:  # At least 2 words (e.g., "buy hold")
-                # Find the FIRST part with trading terms (could be at the beginning)
-                strategy_start = -1
-                for i, word in enumerate(words):
-                    if word.lower() in ["buy", "sell", "enter", "exit", "stop", "take", "profit", "test", "trading", "hold"]:
-                        strategy_start = i
-                        break
+            # Also check for any mention of trading rules
+            if any(word in user_lower for word in ["buy", "sell", "stop loss", "take profit", "entry", "exit", "hold"]):
+                # Extract the full strategy description if it contains trading terms
+                words = user_input.split()
+                if len(words) >= 2:  # At least 2 words (e.g., "buy hold")
+                    # Find the FIRST part with trading terms (could be at the beginning)
+                    strategy_start = -1
+                    for i, word in enumerate(words):
+                        if word.lower() in ["buy", "sell", "enter", "exit", "stop", "take", "profit", "test", "trading", "hold"]:
+                            strategy_start = i
+                            break
 
-                if strategy_start != -1:
-                    strategy_text = ' '.join(words[strategy_start:])
-                    if len(strategy_text) >= 5 and not self.requirements.get("strategy"):  # At least 5 chars
-                        self.requirements["strategy"] = strategy_text.strip()
-                else:
-                    # If no clear start found, check if the whole input looks like a strategy
-                    if len(user_input) > 5 and not self.requirements.get("strategy"):
+                    if strategy_start != -1:
+                        strategy_text = ' '.join(words[strategy_start:])
+                        if len(strategy_text) >= 5 and not self.requirements.get("strategy"):  # At least 5 chars
+                            self.requirements["strategy"] = strategy_text.strip()
+                    else:
+                        # If no clear start found, check if the whole input looks like a strategy
+                        if len(user_input) > 5 and not self.requirements.get("strategy"):
+                            self.requirements["strategy"] = user_input.strip()
+                elif len(words) == 1 and len(user_input) >= 5:
+                    # Single word that's a strategy keyword
+                    if any(kw in user_lower for kw in ["buy", "sell", "hold"]):
                         self.requirements["strategy"] = user_input.strip()
-            elif len(words) == 1 and len(user_input) >= 5:
-                # Single word that's a strategy keyword
-                if any(kw in user_lower for kw in ["buy", "sell", "hold"]):
+
+            # Special case: if we have most requirements but strategy seems incomplete, use full input
+            if (self.requirements.get("ticker") and self.requirements.get("period") and
+                self.requirements.get("capital") and not self.requirements.get("strategy")):
+                if len(user_input) > 20:
                     self.requirements["strategy"] = user_input.strip()
 
-        # Special case: if we have most requirements but strategy seems incomplete, use full input
-        if (self.requirements.get("ticker") and self.requirements.get("period") and
-            self.requirements.get("capital") and not self.requirements.get("strategy")):
-            if len(user_input) > 20:
-                self.requirements["strategy"] = user_input.strip()
+            # Legacy keyword extraction for backup
+            strategy_keywords = []
+            if "buy" in user_lower and "monday" in user_lower:
+                strategy_keywords.append("buy on Monday")
+            if "rsi" in user_lower:
+                strategy_keywords.append("RSI strategy")
+            if "moving average" in user_lower or "ma" in user_lower:
+                strategy_keywords.append("moving average")
+            if "bollinger" in user_lower:
+                strategy_keywords.append("Bollinger Bands")
 
-        # Legacy keyword extraction for backup
-        strategy_keywords = []
-        if "buy" in user_lower and "monday" in user_lower:
-            strategy_keywords.append("buy on Monday")
-        if "rsi" in user_lower:
-            strategy_keywords.append("RSI strategy")
-        if "moving average" in user_lower or "ma" in user_lower:
-            strategy_keywords.append("moving average")
-        if "bollinger" in user_lower:
-            strategy_keywords.append("Bollinger Bands")
-
-        if strategy_keywords and not self.requirements.get("strategy"):
-            self.requirements["strategy"] = ", ".join(strategy_keywords)
+            if strategy_keywords and not self.requirements.get("strategy"):
+                self.requirements["strategy"] = ", ".join(strategy_keywords)
     
     def _extract_requirements(self, response: str):
         """Parse requirements from LLM response."""
