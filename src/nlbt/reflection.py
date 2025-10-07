@@ -783,6 +783,41 @@ Write the COMPLETE corrected code:"""
     
     def _critique_results(self, result: dict) -> dict:
         """Critique the backtest results."""
+        return self._critique_results_llm(result)
+    
+    def _critique_results_llm(self, result: dict) -> dict:
+        """LLM-based result validation with structured output."""
+        prompt = f"""Evaluate this backtest result:
+
+REQUIREMENTS: {self._format_requirements()}
+CODE: {self.code}
+OUTPUT: {result['output']}
+
+Is this backtest ACCEPTABLE? Respond only with JSON:
+{{"acceptable": true/false, "reason": "brief explanation"}}"""
+        
+        try:
+            validation_llm = LLM("gpt-4o-mini")
+            response = validation_llm.ask(prompt).strip()
+            
+            # Extract JSON
+            import json
+            if response.startswith('```'):
+                response = response.split('```')[1].strip()
+                if response.startswith('json'):
+                    response = response[4:].strip()
+            
+            data = json.loads(response)
+            return {
+                "proceed": data.get("acceptable", False),
+                "critique": data.get("reason", "No reason provided")
+            }
+        except Exception:
+            # Fallback to original logic
+            return self._critique_results_original(result)
+    
+    def _critique_results_original(self, result: dict) -> dict:
+        """Original critique logic (fallback)."""
         critique_prompt = f"""Evaluate this backtest result:
 
 REQUIREMENTS:
