@@ -25,3 +25,4 @@ build/
 temp/
 
 cursor_chats/
+!cursor_chats/extreme_promptification.md
