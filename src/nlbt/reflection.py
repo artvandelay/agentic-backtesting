@@ -462,182 +462,6 @@ DECISION: [PROCEED or RETRY]"""
         else:
             return self._phase2_implementation(attempt + 1)
     
-    def _create_implementation_plan(self) -> dict:
-        """Create a detailed implementation plan before coding."""
-        planning_prompt = f"""You are a senior backtesting engineer creating a detailed implementation plan.
-
-REQUIREMENTS:
-{self._format_requirements()}
-
-Following the Agentic Design Patterns principles, create a comprehensive plan:
-
-1. STRATEGY ANALYSIS (Pattern: Planning):
-   - Strategy type: buy-and-hold, mean reversion, momentum, breakout, etc.
-   - Entry conditions: precise logic for when to buy
-   - Exit conditions: precise logic for when to sell/close positions
-   - Risk management: stop losses, position sizing, etc.
-
-2. INDICATOR REQUIREMENTS (Pattern: Tool Use):
-   - Technical indicators needed with exact parameters
-   - How to calculate each in backtesting.py context
-   - Alternative implementations if libraries differ
-
-3. CODE ARCHITECTURE (Pattern: Reflection):
-   - Strategy class structure following backtesting.py patterns
-   - init() method: indicator initialization with error handling
-   - next() method: trading logic with position management
-   - Helper methods for complex calculations
-
-4. IMPORT STRATEGY (Pattern: Tool Use):
-   - Correct imports from backtesting library
-   - Correct imports from ta library (ta.momentum, ta.trend, etc.)
-   - Any additional libraries needed
-
-5. RISK ANALYSIS (Pattern: Exception Handling):
-   - Common failure modes for this strategy type
-   - Edge cases: market closures, data gaps, extreme volatility
-   - Recovery strategies for each failure mode
-
-6. TESTING APPROACH (Pattern: Evaluation):
-   - Component testing before full backtest
-   - Expected behavior validation
-   - Performance metrics to validate
-
-Provide a structured, actionable plan that follows agentic patterns:"""
-
-        try:
-            response = self.code_llm.ask(planning_prompt)
-            # Store the plan for reference
-            self.implementation_plan = response
-            return {"success": True, "plan": response}
-        except Exception as e:
-            return {"success": False, "error": str(e)}
-    
-    def _generate_code_from_plan(self, attempt: int) -> str:
-        """Generate code based on the implementation plan."""
-        if attempt == 1:
-            # First attempt: use the detailed plan
-            code_prompt = f"""You are a senior backtesting engineer implementing a strategy following agentic design patterns.
-
-DETAILED IMPLEMENTATION PLAN:
-{getattr(self, 'implementation_plan', 'No plan available')}
-
-REQUIREMENTS:
-{self._format_requirements()}
-
-FOLLOWING AGENTIC PATTERNS:
-• Use proper imports from ta library (ta.momentum, ta.trend, etc.)
-• Structure code with clear Strategy class following backtesting.py patterns
-• Include error handling and edge case management
-• Use proper indicator calculations with ta library
-• Implement position management and risk controls
-
-CODE REQUIREMENTS:
-1. EXACT imports: Use ta.momentum for RSI, ta.trend for SMA/MACD
-2. Data handling: Use existing get_ohlcv_data() function
-3. Strategy structure: Proper init() and next() methods
-4. Error handling: Handle data issues, calculation errors
-5. Risk management: Implement stop losses, position sizing
-
-INDICATOR INTEGRATION WITH backtesting.Strategy:
-- In init(), ALWAYS create indicators via self.I with a lambda that returns a NumPy array
-- Convert pandas Series to numpy with .to_numpy()
-- Example SMA:
-  from ta.trend import SMAIndicator
-  import pandas as pd
-  self.sma20 = self.I(lambda c: SMAIndicator(close=pd.Series(c), window=20).sma_indicator().to_numpy(), self.data.Close)
-  self.sma50 = self.I(lambda c: SMAIndicator(close=pd.Series(c), window=50).sma_indicator().to_numpy(), self.data.Close)
-- Example RSI:
-  from ta.momentum import RSIIndicator
-  import pandas as pd
-  self.rsi = self.I(lambda c: RSIIndicator(close=pd.Series(c), window=14).rsi().to_numpy(), self.data.Close)
-- Example MACD (returns MACD line):
-  from ta.trend import MACD
-  import pandas as pd
-  self.macd = self.I(lambda c: MACD(close=pd.Series(c), window_slow=26, window_fast=12, window_sign=9).macd().to_numpy(), self.data.Close)
-  self.macd_signal = self.I(lambda c: MACD(close=pd.Series(c), window_slow=26, window_fast=12, window_sign=9).macd_signal().to_numpy(), self.data.Close)
-  # In next(), detect cross without importing backtesting.lib:
-  # bullish_cross = (self.macd[-2] <= self.macd_signal[-2]) and (self.macd[-1] > self.macd_signal[-1])
-
-CRITICAL FIXES:
-- Use 'from ta.trend import MACD' NOT 'from backtesting.test import MACD'
-- Use 'from ta.momentum import RSIIndicator' NOT 'from backtesting.test import RSI'
-- MACD calculation: macd = MACD(close=data.Close, window_slow=26, window_fast=12, window_sign=9).macd()
-- RSI calculation: rsi = RSIIndicator(close=data.Close, window=14).rsi()
-- Do NOT use pandas_ta — use the 'ta' library imports shown above
-
-Generate ONLY the complete, executable Python code:"""
-        else:
-            # Retry attempts: focus on fixing the specific error
-            code_prompt = f"""Fix the code based on this error:
-
-PREVIOUS CODE:
-{self.code}
-
-ERROR:
-{self.last_error}
-
-REQUIREMENTS:
-{self._format_requirements()}
-
-COMMON FIXES:
-- ImportError for RSI: Use 'from ta.momentum import RSIIndicator' and integrate via self.I, e.g. in init():
-    self.rsi = self.I(lambda c: RSIIndicator(close=pd.Series(c), window=14).rsi().to_numpy(), self.data.Close)
-- ImportError for SMA: Use 'from ta.trend import SMAIndicator' and compute with ta, integrated via self.I
-- ImportError for MACD: Use 'from ta.trend import MACD' and integrate via self.I, e.g.:
-    self.macd = self.I(lambda c: MACD(close=pd.Series(c), window_slow=26, window_fast=12, window_sign=9).macd().to_numpy(), self.data.Close)
-- Cash error: Ensure cash=NUMBER (not cash='$10,000')
-- Date format: Use 'YYYY-MM-DD' strings
-- Never import from 'backtesting.test' - use 'ta' library instead
- - Do NOT use pandas_ta; only use the 'ta' package
-
-Write the COMPLETE corrected code:"""
-
-        try:
-            response = self.code_llm.ask(code_prompt)
-            # Extract code from markdown
-            if "```python" in response:
-                code = response.split("```python")[1].split("```")[0].strip()
-            else:
-                code = response.strip()
-            
-            self.code = code
-            return code
-        except Exception as e:
-            self.last_error = str(e)
-            return None
-    
-    def _test_code_components(self, code: str) -> dict:
-        """Test basic code components before full execution."""
-        try:
-            # Basic syntax check
-            compile(code, '<string>', 'exec')
-            
-            # Check for common issues
-            issues = []
-            if 'def get_ohlcv_data' in code:
-                issues.append("Code redefines get_ohlcv_data() - should use existing function")
-            
-            forbidden = [
-                'from backtesting.test import RSI',
-                'from backtesting.test import MACD',
-                'from backtesting.test import SMA',
-                'import pandas_ta',
-                'from pandas_ta',
-            ]
-            for bad in forbidden:
-                if bad in code:
-                    issues.append("Do not import indicators from backtesting.test - use ta library")
-                
-            if issues:
-                return {"success": False, "error": "; ".join(issues)}
-                
-            return {"success": True}
-        except SyntaxError as e:
-            return {"success": False, "error": f"Syntax error: {e}"}
-        except Exception as e:
-            return {"success": False, "error": f"Code validation error: {e}"}
-
     def _get_scaffold_context(self) -> str:
         """Assemble minimal scaffold context for validator prompt."""
         import os
@@ -655,11 +479,6 @@ Write the COMPLETE corrected code:"""
                 refl = f.read()
             head = "\n".join(refl.splitlines()[:150])
             parts.append("REFLECTION.PY (HEAD):\n" + head)
-            marker = "def _test_code_components"
-            idx = refl.find(marker)
-            if idx != -1:
-                snippet = refl[idx:]
-                parts.append("REFLECTION.PY (_test_code_components):\n" + "\n".join(snippet.splitlines()[:120]))
         except Exception:
             pass
         return "\n\n".join(parts)
@@ -828,16 +647,6 @@ Write the COMPLETE fixed code:"""
         # Execute code in sandbox and return raw result
         return self.sandbox.run(code)
     
-    def _handle_code_error(self, test_result: dict, attempt: int) -> str:
-        """Handle code validation errors."""
-        self.last_error = test_result["error"]
-        return self._phase2_implementation(attempt + 1)
-    
-    def _handle_execution_error(self, result: dict, attempt: int) -> str:
-        """Handle execution errors."""
-        self.last_error = result["error"]
-        return self._phase2_implementation(attempt + 1)
-    
     def _critique_results(self, result: dict) -> dict:
         """Critique the backtest results."""
         return self._critique_results_llm(result)
@@ -870,38 +679,8 @@ Is this backtest ACCEPTABLE? Respond only with JSON:
                 "critique": data.get("reason", "No reason provided")
             }
         except Exception:
-            # Fallback to original logic
-            return self._critique_results_original(result)
-    
-    def _critique_results_original(self, result: dict) -> dict:
-        """Original critique logic (fallback)."""
-        critique_prompt = f"""Evaluate this backtest result:
-
-REQUIREMENTS:
-{self._format_requirements()}
-
-CODE:
-{self.code}
-
-RESULTS:
-{result['output']}
-
-EVALUATION:
-✓ Code executed without errors
-✓ Shows backtest results (Return %, Equity Final, etc.)
-✓ Uses correct ticker, period, capital
-✓ Implements the requested strategy
-
-DECISION: [PROCEED or RETRY]
-
-If results are shown and requirements met, say PROCEED."""
-
-        try:
-            critique = self.code_llm.ask(critique_prompt)
-            proceed = "PROCEED" in critique.upper()
-            return {"proceed": proceed, "critique": critique}
-        except Exception as e:
-            return {"proceed": False, "critique": f"Critique error: {e}"}
+            # Simple fallback
+            return {"proceed": False, "critique": "Validation failed"}
     
     def _phase3_reporting(self) -> str:
         """Phase 3: Plan, write, refine report."""
@@ -1261,16 +1040,8 @@ Answer:"""
             response = proceed_llm.ask(prompt).strip().upper()
             return "YES" in response and "NO" not in response
         except:
-            pass
-        
-        # Fallback to simple keyword matching
-        import re
-        user_lower = user_input.lower().strip()
-        proceed_words = ["yes", "go", "proceed", "ok", "start", "continue"]
-        proceed_pattern = r'\b(' + '|'.join(proceed_words) + r')\b'
-        conflict_words = ["but", "change", "explain", "first", "wait", "think", "over", "else"]
-        has_conflict = any(word in user_lower for word in conflict_words)
-        return re.search(proceed_pattern, user_lower) and not has_conflict
+            # Simple fallback
+            return "yes" in user_input.lower() or "go" in user_input.lower()
     
     def _generate_section_name(self, section_type: str, language: str = "English") -> str:
         """Generate section heading via LLM."""
@@ -1384,128 +1155,47 @@ JSON:"""
             if not self.requirements.get(key) and value:
                 self.requirements[key] = value
         
-        # Fallback to regex parsing for any missing fields
+        # Simple fallback if all LLM extraction fails
         if not self.requirements.get("ticker") or not self.requirements.get("period") or not self.requirements.get("capital") or not self.requirements.get("strategy"):
-            self._regex_fallback_extraction(user_input)
+            self._basic_regex_extraction(user_input)
     
-    def _regex_fallback_extraction(self, user_input: str):
-        """Fallback regex extraction (original logic)."""
-        user_lower = user_input.lower()
-        
-        # Extract ticker symbols with improved logic
+    def _basic_regex_extraction(self, user_input: str):
+        """Minimal regex extraction for critical fields only."""
         import re
-
-        # Look for ticker patterns in the entire input (more flexible)
-        ticker_patterns = [
-            r'\b([A-Z]{2,5})\b',  # Standard ticker format
-            r'ticker[:\s]+([A-Z]{2,5})',  # Explicit ticker mentions
-            r'stock[:\s]+([A-Z]{2,5})',   # Stock mentions
-        ]
-
-        for pattern in ticker_patterns:
-            matches = re.findall(pattern, user_input)
-            for potential_ticker in matches:
-                potential_ticker = potential_ticker.upper()
-                if not self.requirements.get("ticker"):
-                    self.requirements["ticker"] = potential_ticker
-                    break
-            if self.requirements.get("ticker"):
-                break
+        
+        # Extract ticker symbols
+        if not self.requirements.get("ticker"):
+            ticker_match = re.search(r'\b([A-Z]{2,5})\b', user_input)
+            if ticker_match:
+                self.requirements["ticker"] = ticker_match.group(1)
         
         # Extract periods
-        if "2024" in user_input and not self.requirements.get("period"):
-            self.requirements["period"] = "2024"
-        elif "2023" in user_input and not self.requirements.get("period"):
-            self.requirements["period"] = "2023"  
-        elif re.search(r'20\d{2}\s*to\s*20\d{2}', user_input) and not self.requirements.get("period"):
-            period_match = re.search(r'(20\d{2}\s*to\s*20\d{2})', user_input)
-            if period_match:
-                self.requirements["period"] = period_match.group(1)
+        if not self.requirements.get("period"):
+            if "2024" in user_input:
+                self.requirements["period"] = "2024"
+            elif "2023" in user_input:
+                self.requirements["period"] = "2023"
         
-        # Extract capital amounts: support $ and ₹ / INR and Indian commas
+        # Extract capital amounts
         if not self.requirements.get("capital"):
-            import re as _re
-            cap_num = None
-            m_usd = _re.search(r'\$\s*([0-9,]+(?:K|k)?)', user_input)
-            m_inr = _re.search(r'(?:₹|INR)\s*([0-9,]+)', user_input, _re.IGNORECASE)
-            if m_usd:
-                cap = m_usd.group(1).replace(',', '')
+            usd_match = re.search(r'\$\s*([0-9,]+(?:K|k)?)', user_input)
+            inr_match = re.search(r'(?:₹|INR)\s*([0-9,]+)', user_input, re.IGNORECASE)
+            if usd_match:
+                cap = usd_match.group(1).replace(',', '')
                 if cap.lower().endswith('k'):
                     cap_num = int(float(cap[:-1]) * 1000)
                 else:
                     cap_num = int(cap)
                 self.requirements["capital"] = f"${cap_num}"
-            elif m_inr:
-                cap = m_inr.group(1).replace(',', '')
-                cap_num = int(cap)
-                self.requirements["capital"] = f"₹{cap_num}"
-
-        # Extract language preference (e.g., "lang hi", "language: Spanish")
-        if not self.requirements.get("lang"):
-            try:
-                import re as _re2
-                m_lang = _re2.search(r'\blang(?:uage)?[:\s]+([A-Za-z\-]+)', user_input, _re2.IGNORECASE)
-                if m_lang:
-                    self.requirements["lang"] = m_lang.group(1).strip()
-            except Exception:
-                pass
+            elif inr_match:
+                cap = inr_match.group(1).replace(',', '')
+                self.requirements["capital"] = f"₹{int(cap)}"
         
-        # Extract strategy - look for complete trading descriptions
+        # Extract strategy from trading keywords
         if not self.requirements.get("strategy"):
-            strategy_patterns = [
-                r'buy.*?stop.*?loss.*?take.*?profit',  # Buy with stop loss and take profit
-                r'buy.*?open',  # Buy at open
-                r'sell.*?close',  # Sell at close
-                r'moving.*?average',  # Moving average strategies
-                r'rsi.*?buy.*?sell',  # RSI strategies
-                r'ema.*?buy.*?sell',  # EMA strategies
-                r'sma.*?buy.*?sell',  # SMA strategies
-            ]
-
-            # Also check for any mention of trading rules
-            if any(word in user_lower for word in ["buy", "sell", "stop loss", "take profit", "entry", "exit", "hold"]):
-                # Extract the full strategy description if it contains trading terms
-                words = user_input.split()
-                if len(words) >= 2:  # At least 2 words (e.g., "buy hold")
-                    # Find the FIRST part with trading terms (could be at the beginning)
-                    strategy_start = -1
-                    for i, word in enumerate(words):
-                        if word.lower() in ["buy", "sell", "enter", "exit", "stop", "take", "profit", "test", "trading", "hold"]:
-                            strategy_start = i
-                            break
-
-                    if strategy_start != -1:
-                        strategy_text = ' '.join(words[strategy_start:])
-                        if len(strategy_text) >= 5 and not self.requirements.get("strategy"):  # At least 5 chars
-                            self.requirements["strategy"] = strategy_text.strip()
-                    else:
-                        # If no clear start found, check if the whole input looks like a strategy
-                        if len(user_input) > 5 and not self.requirements.get("strategy"):
-                            self.requirements["strategy"] = user_input.strip()
-                elif len(words) == 1 and len(user_input) >= 5:
-                    # Single word that's a strategy keyword
-                    if any(kw in user_lower for kw in ["buy", "sell", "hold"]):
-                        self.requirements["strategy"] = user_input.strip()
-
-            # Special case: if we have most requirements but strategy seems incomplete, use full input
-            if (self.requirements.get("ticker") and self.requirements.get("period") and
-                self.requirements.get("capital") and not self.requirements.get("strategy")):
-                if len(user_input) > 20:
-                    self.requirements["strategy"] = user_input.strip()
-
-            # Legacy keyword extraction for backup
-            strategy_keywords = []
-            if "buy" in user_lower and "monday" in user_lower:
-                strategy_keywords.append("buy on Monday")
-            if "rsi" in user_lower:
-                strategy_keywords.append("RSI strategy")
-            if "moving average" in user_lower or "ma" in user_lower:
-                strategy_keywords.append("moving average")
-            if "bollinger" in user_lower:
-                strategy_keywords.append("Bollinger Bands")
-
-            if strategy_keywords and not self.requirements.get("strategy"):
-                self.requirements["strategy"] = ", ".join(strategy_keywords)
+            user_lower = user_input.lower()
+            if any(word in user_lower for word in ["buy", "sell", "hold", "rsi", "sma", "ema"]):
+                self.requirements["strategy"] = user_input.strip()
     
     def _extract_requirements(self, response: str):
         """Parse requirements from LLM response."""
