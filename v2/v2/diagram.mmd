@@ -1,0 +1,29 @@
+flowchart TD
+  %% Styles
+  classDef user fill:#d1e9ff,stroke:#1e73be,color:#0b3d91
+  classDef llm fill:#fff7b2,stroke:#d4b200,color:#7a5a00
+  classDef decision fill:#ffb3b3,stroke:#c70000,color:#660000
+  classDef system fill:#e8f5e9,stroke:#43a047,color:#1b5e20
+
+  U([User]):::user --> P1[[Phase 1 - Strategy Shaping]]:::system
+
+  P1 --> JV[JR coding agent - validate implementability]:::llm
+  JV -->|YES| R1[Refined strategy spec]:::system
+  JV -->|NO| Q1[Ask clarifications - one message - loop until yes]:::llm
+  Q1 --> P1
+
+  R1 --> D1{Proceed?}:::decision
+  D1 -->|Yes| P2[[Phase 2 - Coding agent - three tries]]:::system
+  D1 -->|Change| P1
+
+  P2 --> C1[Generate code and logs]:::llm
+  C1 --> X1[Execute in sandbox]:::system
+  X1 --> CR[Critic evaluate]:::llm
+  CR -->|PASS| P3[[Phase 3 - Reporter]]:::system
+  CR -->|RETRY <= 3| C1
+  CR -->|FAIL| F1([Report failure]):::system
+
+  P3 --> RQ{Data sufficient?}:::decision
+  RQ -->|No - one retry| C1
+  RQ -->|Yes| REP[Write report and TLDR and insights]:::llm
+  REP --> OUT([Report saved and TLDR]):::system
