@@ -408,28 +408,9 @@ Write ONLY the complete code (no markdown, no explanations):"""
         if not result["success"]:
             self.last_error = result["error"]
             
-            # Fix prompt with specific error context
-            fix_prompt = f"""Fix this error. Use the indicator patterns from before.
-
-ERROR:
-{result['error']}
-
-CODE:
-{self.code}
-
-REQUIREMENTS:
-{self._format_requirements()}
-
-CRITICAL FIXES:
-1. NEVER redefine get_ohlcv_data - it exists!
-2. cash must be a number: cash=10000 NOT cash='$10,000'
-3. Dates: '2024-01-01' format
-4. For indicators, use the helper function pattern shown earlier
-5. All indicators must return .to_numpy()
-6. At the end, print TRADES_CSV and EQUITY_CSV exactly as shown:
-   print("TRADES_CSV"); print(stats._trades.to_csv(index=False)); print("EQUITY_CSV"); print(stats._equity_curve.to_csv(index=False))
-
-Write the COMPLETE fixed code:"""
+            # Fix prompt with LLM-generated diagnosis
+            fix_prompt = self._generate_error_fix_prompt(result['error'], self.code)
+            
             
             response = self.code_llm.ask(fix_prompt)
             if "```python" in response:
@@ -792,6 +773,55 @@ Respond only: STOP or CONTINUE"""
         except Exception:
             # Fallback to original logic
             return len(clarifications) >= 5
+    
+    def _generate_error_fix_prompt(self, error: str, code: str) -> str:
+        """Generate LLM-based error diagnosis and fix instructions."""
+        diagnosis_prompt = f"""Analyze this Python backtest error and provide targeted fix instructions:
+
+ERROR:
+{error}
+
+CODE:
+{code}
+
+REQUIREMENTS:
+{self._format_requirements()}
+
+Provide a fix prompt with:
+1. Root cause analysis
+2. Specific fix instructions
+3. Code patterns to use
+4. Common pitfalls to avoid
+
+Format as a clear fix prompt for another LLM to follow."""
+        
+        try:
+            diagnosis_llm = LLM("gpt-4o-mini")
+            custom_fix_prompt = diagnosis_llm.ask(diagnosis_prompt)
+            return custom_fix_prompt
+        except Exception:
+            # Fallback to original hardcoded prompt
+            return f"""Fix this error. Use the indicator patterns from before.
+
+ERROR:
+{error}
+
+CODE:
+{code}
+
+REQUIREMENTS:
+{self._format_requirements()}
+
+CRITICAL FIXES:
+1. NEVER redefine get_ohlcv_data - it exists!
+2. cash must be a number: cash=10000 NOT cash='$10,000'
+3. Dates: '2024-01-01' format
+4. For indicators, use the helper function pattern shown earlier
+5. All indicators must return .to_numpy()
+6. At the end, print TRADES_CSV and EQUITY_CSV exactly as shown:
+   print("TRADES_CSV"); print(stats._trades.to_csv(index=False)); print("EQUITY_CSV"); print(stats._equity_curve.to_csv(index=False))
+
+Write the COMPLETE fixed code:"""
     
     def _execute_backtest(self, code: str) -> dict:
         """Execute the backtest code."""
