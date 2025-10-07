@@ -37,7 +37,7 @@ class Reporter:
 ```
 """
         
-        # Save report
+        # Save report  
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         ticker = requirements.get('ticker', 'UNKNOWN')
         report_dir = f"reports/{ticker}_{timestamp}"

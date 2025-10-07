@@ -50,12 +50,16 @@ class Engine:
             "requirements": self.requirements
         })
         
-        # Update requirements
-        self.requirements.update(comm_result["requirements"])
+        # Update requirements (merge, don't replace)
+        for key, value in comm_result["requirements"].items():
+            if value and value != "CURRENT":
+                self.requirements[key] = value
+        
+        # Save response for history
+        response = comm_result["response"]
         
         # If communicator doesn't have complete info, ask user
         if not comm_result["complete"]:
-            response = comm_result["response"]
             self.conversation_history.append(f"Agent: {response}")
             return response
         
@@ -72,22 +76,27 @@ class Engine:
         else:
             # Need clarifications - loop back
             clarifications = "\n".join([f"- {c}" for c in validation["clarifications"]])
-            response = f"I need some clarifications:\n{clarifications}"
+            response = f"{comm_result['response']}\n\nHowever, I need some clarifications:\n{clarifications}"
             self.conversation_history.append(f"Agent: {response}")
             return response
     
     def _phase2_implementation(self) -> str:
         """Phase 2: Strong Coder → Critic loop."""
         
+        feedback = None
         # Try up to 3 times
         for attempt in range(1, 4):
             # Generate code
             coder_result = self.strong_coder.generate_and_test(
                 self.requirements, 
-                attempt=attempt
+                attempt=attempt,
+                feedback=feedback
             )
             
             if not coder_result["success"]:
+                # Debug: print error
+                print(f"\n[DEBUG] Attempt {attempt} failed: {coder_result['error'][:200]}...")
+                
                 # Evaluate error
                 critic_eval = self.critic.evaluate(
                     coder_result["code"],
@@ -96,7 +105,8 @@ class Engine:
                 )
                 
                 if critic_eval["status"] == "retry" and attempt < 3:
-                    continue  # Try again
+                    feedback = critic_eval["feedback"]
+                    continue  # Try again with feedback
                 elif critic_eval["status"] == "fail":
                     return f"❌ Failed to implement strategy: {coder_result['error']}"
             else:
