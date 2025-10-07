@@ -757,7 +757,7 @@ Write the COMPLETE corrected code:"""
                         break
                     if s.startswith(('-', '•', '*')) or (len(s) > 1 and s[0].isdigit()):
                         clarifications.append(s.lstrip('-•* ').strip())
-                        if len(clarifications) >= 5:
+                        if self._should_stop_clarifications(clarifications):
                             break
                     else:
                         break
@@ -765,6 +765,33 @@ Write the COMPLETE corrected code:"""
                     start = True
 
         return {"implementable": implementable, "clarifications": clarifications, "raw": text}
+    
+    def _should_stop_clarifications(self, clarifications: list) -> bool:
+        """LLM decides if we have enough clarifications."""
+        if len(clarifications) < 2:
+            return False  # Always get at least 2
+        if len(clarifications) >= 8:
+            return True   # Hard limit at 8
+            
+        prompt = f"""Given these clarification questions, should we stop asking and proceed?
+
+CLARIFICATIONS SO FAR ({len(clarifications)}):
+{chr(10).join(f'{i+1}. {c}' for i, c in enumerate(clarifications))}
+
+Consider:
+- Are the key requirements covered?
+- Is there diminishing value in more questions?
+- Would a user be overwhelmed by more questions?
+
+Respond only: STOP or CONTINUE"""
+        
+        try:
+            decision_llm = LLM("gpt-4o-mini")
+            response = decision_llm.ask(prompt).strip().upper()
+            return "STOP" in response
+        except Exception:
+            # Fallback to original logic
+            return len(clarifications) >= 5
     
     def _execute_backtest(self, code: str) -> dict:
         """Execute the backtest code."""
