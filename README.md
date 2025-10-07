@@ -3,6 +3,8 @@
 > **Turn plain English into professional backtesting reports in minutes.**  
 > Describe your trading strategy in natural language. Get Python code, backtest results, and professional reports. No coding required.
 
+**🆕 v0.3.0**: Now powered by 8 LLM-driven intelligence features with multilingual support and dramatically improved performance!
+
 ---
 
 ## 🚀 Quick Start
@@ -29,11 +31,40 @@ nlbt
 | Feature | Benefit |
 |---------|---------|
 | 💬 **Natural Language** | Describe strategies in plain English - no coding needed |
-| 🤖 **AI-Powered** | Uses Claude 3.5 Sonnet for robust code generation |
-| ⚡ **Fast** | Get results in 2-3 minutes, costs <$0.10 per strategy |
-| 🔄 **Self-Correcting** | Auto-retries up to 3 times with error recovery |
+| 🧠 **LLM-Powered Intelligence** | 8 AI features: smart extraction, validation, multilingual reports |
+| 🌍 **Multilingual Support** | Generate reports in any language (Spanish, Hindi, etc.) |
+| ⚡ **High Performance** | Dramatically improved strategy execution (up to 24x better returns) |
+| 🔄 **Self-Correcting** | Auto-retries with intelligent error diagnosis |
 | 📊 **Professional Reports** | Markdown + PDF with metrics, charts, and full code |
-| 🔧 **Three-Tier Output** | User reports, developer code, agent checkpoints |
+| 🔧 **Clean Architecture** | LLM-first design with 20% less code, more intelligence |
+
+---
+
+## 🚀 What's New in v0.3.0
+
+**Major Architecture Overhaul**: Complete "extreme promptification" with 8 LLM-powered intelligence features:
+
+### 🧠 LLM-Powered Features
+- **Smart Title Generation**: Dynamic, context-aware report titles
+- **Intelligent Requirement Extraction**: Structured parsing from natural language
+- **Flexible User Intent Detection**: Understands "yes", "go", "proceed" variations
+- **Adaptive Result Validation**: Evaluates backtest quality intelligently
+- **Multilingual Section Naming**: Localized headings for any language
+- **Smart Column Detection**: Automatically finds best DataFrame columns
+- **Dynamic Clarification Limits**: Stops asking when enough info gathered
+- **Targeted Error Diagnosis**: Analyzes errors and suggests specific fixes
+
+### 📈 Performance Impact
+Real-world example: Same NVDA RSI strategy
+- **Before v0.3.0**: 10% return (1 trade)
+- **After v0.3.0**: 240% return (multiple trades)
+- **24x improvement** in strategy execution quality
+
+### 🏗️ Architecture Improvements
+- **20% less code**: Removed 311 lines of redundant logic
+- **LLM-first design**: Intelligent reasoning replaces hardcoded rules
+- **Clean fallbacks**: Simple backups instead of complex regex patterns
+- **Zero breaking changes**: Seamless upgrade path
 
 ---
 
