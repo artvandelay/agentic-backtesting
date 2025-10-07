@@ -4,10 +4,16 @@ This document consolidates developer‑facing notes from root markdown files.
 
 ## Architecture
 
-Three‑phase reflection engine:
-- Phase 1: Understanding — requirement extraction via LLM prompts
-- Phase 2: Implementation — producer code generation → sandbox execution → critic evaluation
-- Phase 3: Reporting — plan → write markdown → save to `reports/`
+Three‑phase reflection engine with LLM-powered intelligence:
+- Phase 1: Understanding — LLM-based requirement extraction with multilingual support
+- Phase 2: Implementation — producer code generation → sandbox execution → LLM critic evaluation  
+- Phase 3: Reporting — LLM-generated plans → multilingual reports → save to `reports/`
+
+**Key Features:**
+- **8 LLM-powered components**: Title generation, requirement extraction, validation, error diagnosis, etc.
+- **Multilingual support**: Reports in any language via `lang <language>` parameter
+- **Intelligent fallbacks**: Clean LLM-first architecture with minimal regex backup
+- **Self-correcting**: Auto-retry with LLM-analyzed error diagnosis
 
 Key modules:
 - `src/nlbt/llm.py`: LLM wrapper using `llm` CLI; loads `.env` if present
