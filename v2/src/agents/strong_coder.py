@@ -70,20 +70,41 @@ IMPORTANT RULES:
 8. Always check self.position before trading
 9. Use self.buy() and self.position.close() for trades
 
-INDICATOR EXAMPLES (define helper functions in init):
-```
-def init(self):
-    # Define indicator functions
-    def rsi(values, n=14):
-        return ta.momentum.RSIIndicator(pd.Series(values), window=n).rsi().to_numpy()
-    
-    def sma(values, n=20):
-        return ta.trend.SMAIndicator(pd.Series(values), window=n).sma_indicator().to_numpy()
-    
-    # Create indicators
-    self.rsi = self.I(rsi, self.data.Close, 14)
-    self.sma = self.I(sma, self.data.Close, 20)
-```
+       INDICATOR EXAMPLES (define helper functions in init):
+       ```
+       def init(self):
+           # Define indicator functions
+           def rsi(values, n=14):
+               return ta.momentum.RSIIndicator(pd.Series(values), window=n).rsi().to_numpy()
+           
+           def sma(values, n=20):
+               return ta.trend.SMAIndicator(pd.Series(values), window=n).sma_indicator().to_numpy()
+           
+           def volume_sma(volume_values, n=10):
+               return ta.trend.SMAIndicator(pd.Series(volume_values), window=n).sma_indicator().to_numpy()
+           
+           # Create indicators
+           self.rsi = self.I(rsi, self.data.Close, 14)
+           self.sma = self.I(sma, self.data.Close, 20)
+           self.volume_avg = self.I(volume_sma, self.data.Volume, 10)
+       ```
+       
+       VOLUME CONDITION EXAMPLES:
+       ```
+       def next(self):
+           # Volume is 150% above 10-day average
+           current_volume = self.data.Volume[-1]
+           avg_volume = self.volume_avg[-1]
+           volume_condition = current_volume > (avg_volume * 1.5)
+           
+           # Price is 1.5% above 21-day EMA
+           current_price = self.data.Close[-1]
+           ema_value = self.ema[-1]
+           price_condition = current_price > (ema_value * 1.015)
+           
+           if volume_condition and price_condition and not self.position:
+               self.buy()
+       ```
 
 CODE STRUCTURE:
 from backtesting import Backtest, Strategy

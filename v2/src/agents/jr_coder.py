@@ -106,7 +106,16 @@ class MyStrategy(Strategy):
         # Trading logic (if not self.position: self.buy())
         
 KEY LIMITATIONS:
-- Single ticker per backtest
-- No options/futures
+- Single ticker per backtest (BUT correlation-based signals are OK if they use one primary ticker)
+- No options/futures  
 - No intraday data (daily bars only)
-- No custom order types (market orders only)"""
+- No custom order types (market orders only)
+
+CORRELATION-BASED STRATEGIES (SUPPORTED):
+✅ "SPY strategy using VIX correlation" → Use SPY as primary ticker, VIX correlation as signal
+✅ "Trade AAPL based on SPY momentum" → Use AAPL as primary ticker, SPY as signal
+✅ "QQQ mean reversion with market sentiment" → Use QQQ as primary ticker
+
+MULTI-ASSET ROTATION (NOT SUPPORTED):
+❌ "Rotate between AAPL, GOOGL, TSLA" → Requires portfolio rotation
+❌ "Equal weight SPY and QQQ" → Requires multiple positions"""
