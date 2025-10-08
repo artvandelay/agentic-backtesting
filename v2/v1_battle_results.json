@@ -1,0 +1,228 @@
+{
+  "timestamp": "2025-10-08T07:15:10.873163",
+  "total_duration": 256.5088219642639,
+  "success_rate": 0.6,
+  "multi_turn_success": 0.6666666666666666,
+  "state_change_success": 0.5,
+  "tests": [
+    {
+      "test_num": 1,
+      "name": "Multi-Turn State Changes",
+      "conversation": [
+        "Buy and hold AAPL with $10k",
+        "actually change ticker to TSLA",
+        "make it $50000",
+        "use 2023 instead of 2024",
+        "let's do RSI strategy instead"
+      ],
+      "expected": "Should handle multiple requirement changes gracefully",
+      "difficulty": "HARD",
+      "duration": 17.294984817504883,
+      "timeout": false,
+      "stdout": "\ud83d\ude80 NLBT v2 - Triplet Architecture\n========================================\nDescribe your trading strategy (or 'exit' to quit)\n\n\ud83d\udcad You: \n\ud83e\udd16 Agent: Great choice with AAPL! Just to clarify, what specific period do you want to backtest for your buy and hold strategy?\n\n\ud83d\udcad You: \n\ud83e\udd16 Agent: Thanks for the update! Just to finalize your backtest, could you please let me know the specific period you'd like to test your buy and hold strategy for TSLA?\n\n\ud83d\udcad You: \n\ud83e\udd16 Agent: Thanks for the update on the capital! Just a quick question: for what specific period would you like to backtest your buy and hold strategy for TSLA?\n\n\ud83d\udcad You: \n\ud83e\udd16 Agent: Thanks for that update! Just to finalize everything, could you specify the exact timeframe within 2023 that you'd like to backtest your buy and hold strategy for TSLA?\n\n\ud83d\udcad You: \n\ud83e\udd16 Agent: Great choice on switching to the RSI strategy! To set everything up, could you let me know the specific parameters you'd like to use for the RSI, such as the overbought and oversold levels?\n\n\ud83d\udcad You: \n\ud83d\udc4b Goodbye!\n",
+      "stderr": "",
+      "analysis": {
+        "conversation_turns": 5,
+        "agent_responses": 5,
+        "multi_turn": true,
+        "has_state_changes": true
+      },
+      "outcome": "UNKNOWN - Unexpected behavior",
+      "success": false
+    },
+    {
+      "test_num": 2,
+      "name": "Confirmation Workflow",
+      "conversation": [
+        "Buy SPY when RSI < 30, sell when RSI > 70, 2023, $10,000",
+        "yes",
+        "proceed with implementation"
+      ],
+      "expected": "Should proceed after confirmation (v1 behavior)",
+      "difficulty": "MEDIUM",
+      "duration": 39.699053049087524,
+      "timeout": false,
+      "stdout": "\ud83d\ude80 NLBT v2 - Triplet Architecture\n========================================\nDescribe your trading strategy (or 'exit' to quit)\n\n\ud83d\udcad You: \n\ud83e\udd16 Agent: \n\u2705 Report generated!\n\n\ud83d\udcc8 Profitable \u00b7 Buy SPY when RSI < 30, sell when RSI > 70 \u00b7 Return: 7.28% \u00b7 Max DD: -5.81% \u00b7 Final: $10,727.83\n\n\ud83d\udcc4 Full report: reports/SPY_2023_20251008_071602/report.md\n\n\n\ud83d\udcad You: \n\ud83e\udd16 Agent: It looks like we\u2019re almost there! Could you please let me know which ticker you'd like to use for your backtesting?\n\n\ud83d\udcad You: \n\ud83e\udd16 Agent: It looks like we still need to specify the ticker and the period for your backtesting. Could you let me know which ticker you\u2019d like to use and for what time period?\n\n\ud83d\udcad You: \n\ud83d\udc4b Goodbye!\n",
+      "stderr": "/Users/jigar/projects/0n-going/evaluate-trading-strategy/v2/./src/agents/reporter.py:220: UserWarning: Glyph 128200 (\\N{CHART WITH UPWARDS TREND}) missing from current font.\n  pdf.savefig(fig, bbox_inches='tight')\n",
+      "analysis": {
+        "conversation_turns": 3,
+        "agent_responses": 3,
+        "report_path": "reports/SPY_2023_20251008_071602/report.md",
+        "multi_turn": true
+      },
+      "outcome": "SUCCESS - Report Generated",
+      "success": true
+    },
+    {
+      "test_num": 3,
+      "name": "Mixed Proceed and Change",
+      "conversation": [
+        "Test RSI strategy on AAPL in 2024 with $20k",
+        "yes but change the period to 2023",
+        "go ahead and explain the approach first"
+      ],
+      "expected": "Should handle mixed confirmation with changes",
+      "difficulty": "HARD",
+      "duration": 12.38567304611206,
+      "timeout": false,
+      "stdout": "\ud83d\ude80 NLBT v2 - Triplet Architecture\n========================================\nDescribe your trading strategy (or 'exit' to quit)\n\n\ud83d\udcad You: \n\ud83e\udd16 Agent: Great! I have noted down your request to test the RSI strategy on AAPL in 2024 with $20k. If you have any further details or adjustments you'd like to make, feel free to let me know!\n\nHowever, I need some clarifications:\n- Specify exact RSI period and threshold values (e.g., \"Use 14-period RSI with buy threshold at 30 and sell threshold at 70\").\n- Define how you want to handle the position sizing and stop-loss/take-profit levels (e.g., \"Use fixed percentage of capital for each trade or specific dollar amount\").\n\n\ud83d\udcad You: \n\ud83e\udd16 Agent: Thanks for the update! I\u2019ve changed the period to 2023. Could you please specify the exact RSI period and the threshold values you\u2019d like to use for buy and sell signals?\n\n\ud83d\udcad You: \n\ud83e\udd16 Agent: Thanks for your patience! To move forward, could you please specify the exact RSI period and the threshold values you'd like to use for buy and sell signals (for example, \"Use 14-period RSI with buy threshold at 30 and sell threshold at 70\")?\n\n\ud83d\udcad You: \n\ud83d\udc4b Goodbye!\n",
+      "stderr": "",
+      "analysis": {
+        "conversation_turns": 3,
+        "agent_responses": 3,
+        "multi_turn": true,
+        "has_state_changes": true
+      },
+      "outcome": "CLARIFICATION - Asked for more info",
+      "success": true
+    },
+    {
+      "test_num": 4,
+      "name": "Uncertainty and Questions",
+      "conversation": [
+        "Buy NVDA on momentum signals",
+        "I'm not sure about this",
+        "what indicators will you use?",
+        "how does backtesting work?",
+        "maybe we should try something else"
+      ],
+      "expected": "Should handle uncertainty and educational questions",
+      "difficulty": "MEDIUM",
+      "duration": 16.366687059402466,
+      "timeout": false,
+      "stdout": "\ud83d\ude80 NLBT v2 - Triplet Architecture\n========================================\nDescribe your trading strategy (or 'exit' to quit)\n\n\ud83d\udcad You: \n\ud83e\udd16 Agent: Great choice on using momentum signals for NVDA! Could you let me know how much capital you'd like to allocate for this strategy?\n\n\ud83d\udcad You: \n\ud83e\udd16 Agent: No worries! It can be tricky to decide on capital allocation. Do you have a rough idea of how much you would like to invest in this strategy?\n\n\ud83d\udcad You: \n\ud83e\udd16 Agent: That's a great question about indicators! To tailor the strategy best for you, could you let me know the period over which you're planning to trade? Are you thinking short-term or long-term?\n\n\ud83d\udcad You: \n\ud83e\udd16 Agent: Backtesting works by simulating a trading strategy using historical data to see how it would have performed in the past. It helps you evaluate the potential effectiveness of your strategy before investing real money. To proceed, could you let me know what time frame you're considering for your trading\u2014short-term or long-term?\n\n\ud83d\udcad You: \n\ud83e\udd16 Agent: I understand you're looking to explore different options! To better assist you, could you clarify what time frame you\u2019re thinking about for your trading strategy\u2014short-term or long-term?\n\n\ud83d\udcad You: \n\ud83d\udc4b Goodbye!\n",
+      "stderr": "",
+      "analysis": {
+        "conversation_turns": 5,
+        "agent_responses": 5,
+        "multi_turn": true
+      },
+      "outcome": "UNKNOWN - Unexpected behavior",
+      "success": false
+    },
+    {
+      "test_num": 5,
+      "name": "Reset and Restart",
+      "conversation": [
+        "Buy and hold AAPL in 2024 with $10k",
+        "no",
+        "reset everything",
+        "let's start over",
+        "Buy SPY with RSI strategy in 2023 with $30k"
+      ],
+      "expected": "Should handle reset/restart workflow",
+      "difficulty": "MEDIUM",
+      "duration": 99.45220494270325,
+      "timeout": false,
+      "stdout": "\ud83d\ude80 NLBT v2 - Triplet Architecture\n========================================\nDescribe your trading strategy (or 'exit' to quit)\n\n\ud83d\udcad You: \n\ud83e\udd16 Agent: \n\u2705 Report generated!\n\n\ud83d\udcc8 Profitable \u00b7 Buy and hold \u00b7 Return: 37.19% \u00b7 Max DD: -12.59% \u00b7 Final: $13,718.58\n\n\ud83d\udcc4 Full report: reports/AAPL_2024_20251008_071721/report.md\n\n\n\ud83d\udcad You: \n\ud83e\udd16 Agent: It looks like there's some information missing! Can you please specify which ticker you'd like to trade?\n\n\ud83d\udcad You: \n\ud83e\udd16 Agent: It looks like we need to start fresh! Could you please let me know which ticker you'd like to trade?\n\n\ud83d\udcad You: \n\ud83e\udd16 Agent: It seems we still need some details to get started! Could you please let me know which ticker you'd like to trade?\n\n\ud83d\udcad You: \n\ud83e\udd16 Agent: \n\u2705 Report generated!\n\n\ud83d\udcc8 Profitable \u00b7 RSI \u00b7 Return: 0.33% \u00b7 Max DD: -0.00% \u00b7 Final: $30,098.61\n\n\ud83d\udcc4 Full report: reports/SPY_2023_20251008_071819/report.md\n\n\n\ud83d\udcad You: \n\ud83d\udc4b Goodbye!\n",
+      "stderr": "/Users/jigar/projects/0n-going/evaluate-trading-strategy/v2/./src/agents/reporter.py:220: UserWarning: Glyph 128200 (\\N{CHART WITH UPWARDS TREND}) missing from current font.\n  pdf.savefig(fig, bbox_inches='tight')\n/Users/jigar/projects/0n-going/evaluate-trading-strategy/v2/./src/agents/reporter.py:220: UserWarning: Glyph 128200 (\\N{CHART WITH UPWARDS TREND}) missing from current font.\n  pdf.savefig(fig, bbox_inches='tight')\n",
+      "analysis": {
+        "conversation_turns": 5,
+        "agent_responses": 5,
+        "report_path": "reports/SPY_2023_20251008_071819/report.md",
+        "multi_turn": true
+      },
+      "outcome": "SUCCESS - Report Generated",
+      "success": true
+    },
+    {
+      "test_num": 6,
+      "name": "Multi-Asset Validation",
+      "conversation": [
+        "Rotate between GLD and SPY based on momentum, 2020-2024, $50k"
+      ],
+      "expected": "Should block with clarifications (v1 validation behavior)",
+      "difficulty": "EASY",
+      "duration": 7.422980070114136,
+      "timeout": false,
+      "stdout": "\ud83d\ude80 NLBT v2 - Triplet Architecture\n========================================\nDescribe your trading strategy (or 'exit' to quit)\n\n\ud83d\udcad You: \n\ud83e\udd16 Agent: It looks like you've provided all the information I need! We'll backtest a rotation strategy between GLD and SPY based on momentum from 2020 to 2024 with a capital of $50,000. If you have any more details or specific metrics in mind, feel free to share!\n\nHowever, I need some clarifications:\n- Specify the exact momentum indicator you wish to use for the rotation (e.g., SMA, EMA, RSI, etc.) and define the thresholds for entering and exiting positions based on that momentum.\n- Please confirm how the rotation between GLD and SPY is triggered; do you want to switch based on the relative strength of the two, or based on a specific indicator's signal?\n\n\ud83d\udcad You: \n\ud83d\udc4b Goodbye!\n",
+      "stderr": "",
+      "analysis": {
+        "conversation_turns": 1,
+        "agent_responses": 1
+      },
+      "outcome": "CLARIFICATION - Asked for more info",
+      "success": true
+    },
+    {
+      "test_num": 7,
+      "name": "Vague Strategy Clarification",
+      "conversation": [
+        "Buy SPY on dips in 2024 with $20k"
+      ],
+      "expected": "Should ask for numeric dip definition",
+      "difficulty": "EASY",
+      "duration": 3.2406089305877686,
+      "timeout": false,
+      "stdout": "\ud83d\ude80 NLBT v2 - Triplet Architecture\n========================================\nDescribe your trading strategy (or 'exit' to quit)\n\n\ud83d\udcad You: \n\ud83e\udd16 Agent: Great choice with SPY! Just to clarify, what specific criteria would you like to define for what constitutes a \"dip\" in your strategy?\n\n\ud83d\udcad You: \n\ud83d\udc4b Goodbye!\n",
+      "stderr": "",
+      "analysis": {
+        "conversation_turns": 1,
+        "agent_responses": 1
+      },
+      "outcome": "UNKNOWN - Unexpected behavior",
+      "success": false
+    },
+    {
+      "test_num": 8,
+      "name": "Contradictory Logic",
+      "conversation": [
+        "Buy when RSI > 70 and < 30 simultaneously, SPY, 2023, $10k"
+      ],
+      "expected": "Should ask to resolve contradiction",
+      "difficulty": "MEDIUM",
+      "duration": 4.381281137466431,
+      "timeout": false,
+      "stdout": "\ud83d\ude80 NLBT v2 - Triplet Architecture\n========================================\nDescribe your trading strategy (or 'exit' to quit)\n\n\ud83d\udcad You: \n\ud83e\udd16 Agent: It looks like we have the ticker, period, capital, and strategy, but the strategy condition seems contradictory since RSI can't be both above 70 and below 30 at the same time. Could you clarify your intended RSI conditions?\n\n\ud83d\udcad You: \n\ud83d\udc4b Goodbye!\n",
+      "stderr": "",
+      "analysis": {
+        "conversation_turns": 1,
+        "agent_responses": 1
+      },
+      "outcome": "UNKNOWN - Unexpected behavior",
+      "success": false
+    },
+    {
+      "test_num": 9,
+      "name": "Unsupported Features",
+      "conversation": [
+        "Options iron condor on SPY, 2024, $10k"
+      ],
+      "expected": "Should explain unsupported and suggest alternatives",
+      "difficulty": "EASY",
+      "duration": 6.429295778274536,
+      "timeout": false,
+      "stdout": "\ud83d\ude80 NLBT v2 - Triplet Architecture\n========================================\nDescribe your trading strategy (or 'exit' to quit)\n\n\ud83d\udcad You: \n\ud83e\udd16 Agent: Great choice with the options iron condor on SPY for 2024 with $10k! If you need any help with specific backtesting parameters or any additional details, feel free to ask!\n\nHowever, I need some clarifications:\n- The strategy is described as an \"Iron Condor,\" which typically involves options trading. Since options cannot be used, please clarify how you intend to adapt this strategy for a long/short equity approach using only the SPY ticker.\n- Please specify the entry/exit rules for this strategy, such as the indicators and their specific thresholds you plan to use.\n\n\ud83d\udcad You: \n\ud83d\udc4b Goodbye!\n",
+      "stderr": "",
+      "analysis": {
+        "conversation_turns": 1,
+        "agent_responses": 1
+      },
+      "outcome": "CLARIFICATION - Asked for more info",
+      "success": true
+    },
+    {
+      "test_num": 10,
+      "name": "Multi-Turn Clarification",
+      "conversation": [
+        "Buy SPY on dips",
+        "Buy SPY when price drops 5% below 10-day EMA, sell on cross back above; 2023; $10k",
+        "proceed"
+      ],
+      "expected": "Should handle vague->specific->proceed workflow",
+      "difficulty": "HARD",
+      "duration": 39.80716276168823,
+      "timeout": false,
+      "stdout": "\ud83d\ude80 NLBT v2 - Triplet Architecture\n========================================\nDescribe your trading strategy (or 'exit' to quit)\n\n\ud83d\udcad You: \n\ud83e\udd16 Agent: Great choice on trading SPY by buying on dips! Could you please let me know how much capital you plan to use for this strategy?\n\n\ud83d\udcad You: \n\ud83e\udd16 Agent: Thanks for sharing your strategy! I see you mentioned 2023 and a capital of $10,000, but could you clarify the backtesting period you would like to use within 2023? For example, are you looking to test all of 2023 or a specific timeframe?\n\n\ud83d\udcad You: \n\ud83e\udd16 Agent: \n\u2705 Report generated!\n\n\ud83d\udcc9 Loss \u00b7 Buy when price drops 5% below 10-day EMA, sell on cross back above \u00b7 Return: 0.00% \u00b7 Max DD: -0.00% \u00b7 Final: $10,000.00\n\n\ud83d\udcc4 Full report: reports/SPY_2023_20251008_071925/report.md\n\n\n\ud83d\udcad You: \n\ud83d\udc4b Goodbye!\n",
+      "stderr": "/Users/jigar/projects/0n-going/evaluate-trading-strategy/v2/./src/agents/reporter.py:220: UserWarning: Glyph 128201 (\\N{CHART WITH DOWNWARDS TREND}) missing from current font.\n  pdf.savefig(fig, bbox_inches='tight')\n",
+      "analysis": {
+        "conversation_turns": 3,
+        "agent_responses": 3,
+        "report_path": "reports/SPY_2023_20251008_071925/report.md",
+        "multi_turn": true
+      },
+      "outcome": "SUCCESS - Report Generated",
+      "success": true
+    }
+  ]
+}
