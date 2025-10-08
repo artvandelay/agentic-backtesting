@@ -65,20 +65,49 @@ IMPORTANT RULES:
 3. Create a Strategy class inheriting from Strategy
 4. Implement init() and next() methods
 5. Print the full stats object at the end
-6. Add helpful comments
+6. For indicators, use the ta library (already imported)
+7. Common indicators: ta.rsi(), ta.sma(), ta.ema(), ta.macd(), ta.bbands()
+8. Always check self.position before trading
+9. Use self.buy() and self.position.close() for trades
+
+INDICATOR EXAMPLES (define helper functions in init):
+```
+def init(self):
+    # Define indicator functions
+    def rsi(values, n=14):
+        return ta.momentum.RSIIndicator(pd.Series(values), window=n).rsi().to_numpy()
+    
+    def sma(values, n=20):
+        return ta.trend.SMAIndicator(pd.Series(values), window=n).sma_indicator().to_numpy()
+    
+    # Create indicators
+    self.rsi = self.I(rsi, self.data.Close, 14)
+    self.sma = self.I(sma, self.data.Close, 20)
+```
 
 CODE STRUCTURE:
 from backtesting import Backtest, Strategy
+import pandas as pd
+import ta
 
 # Fetch data
 data = get_ohlcv_data('TICKER', 'START_DATE', 'END_DATE')
 
 class MyStrategy(Strategy):
     def init(self):
-        # Initialize indicators here
+        # Define indicator helper functions first
+        def rsi(values, n=14):
+            return ta.momentum.RSIIndicator(pd.Series(values), window=n).rsi().to_numpy()
+        
+        # Then create indicators using self.I()
+        # self.rsi = self.I(rsi, self.data.Close, 14)
         
     def next(self):
-        # Trading logic here
+        # Trading logic
+        # if self.rsi[-1] < 30 and not self.position: 
+        #     self.buy()
+        # elif self.position and self.rsi[-1] > 70:
+        #     self.position.close()
         
 # Run backtest
 bt = Backtest(data, MyStrategy, cash=CAPITAL)

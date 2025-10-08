@@ -94,9 +94,8 @@ class Engine:
             )
             
             if not coder_result["success"]:
-                # Debug: print error
-                print(f"\n[DEBUG] Attempt {attempt} failed: {coder_result['error'][:200]}...")
-                
+                # Debug error
+                print(f"\n[DEBUG] Attempt {attempt} error: {coder_result['error']}")
                 # Evaluate error
                 critic_eval = self.critic.evaluate(
                     coder_result["code"],
