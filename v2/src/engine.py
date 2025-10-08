@@ -94,8 +94,6 @@ class Engine:
             )
             
             if not coder_result["success"]:
-                # Debug error
-                print(f"\n[DEBUG] Attempt {attempt} error: {coder_result['error']}")
                 # Evaluate error
                 critic_eval = self.critic.evaluate(
                     coder_result["code"],
@@ -121,11 +119,12 @@ class Engine:
     def _phase3_reporting(self) -> str:
         """Phase 3: Reporter generates final output."""
         
-        # Generate report
+        # Generate report with full context
         report_result = self.reporter.generate_report(
             self.requirements,
             self.code,
-            self.results
+            self.results,
+            conversation_history=self.conversation_history
         )
         
         # Check if reporter needs more data
