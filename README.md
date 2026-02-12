@@ -1,5 +1,7 @@
 # NLBT — Natural Language Backtesting
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/artvandelay/agentic-backtesting)
+
 > **Turn plain English into professional backtesting reports in minutes.**  
 > Describe your trading strategy in natural language. Get Python code, backtest results, and professional reports. No coding required.
 
