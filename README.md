@@ -453,6 +453,19 @@ See issues or open a PR!
 
 ---
 
+## 🛠️ Services & Operations
+
+NLBT now includes containerized ingest/enrich/detect/report services with observability,
+storage migrations, and runbooks:
+
+- Dockerfiles: `services/ingest`, `services/enrich`, `services/detect`, `services/report`
+- Configuration: `docs/configuration.md`
+- Runbooks: `docs/runbooks.md`
+- Migrations: `storage/migrations`
+- Backup/restore: `scripts/db_backup.sh`, `scripts/db_restore.sh`
+
+---
+
 ## 📄 License
 
 GPL-3.0 License. See `LICENSE`.

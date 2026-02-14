@@ -19,8 +19,11 @@ dependencies = [
     "matplotlib",
     "markdown",
     "weasyprint",
+    "fastapi",
+    "httpx",
+    "prometheus_client",
+    "uvicorn",
 ]
 
 [project.scripts]
 nlbt = "nlbt.cli:main"
-
