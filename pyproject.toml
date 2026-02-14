@@ -19,8 +19,8 @@ dependencies = [
     "matplotlib",
     "markdown",
     "weasyprint",
+    "psycopg2-binary",
 ]
 
 [project.scripts]
 nlbt = "nlbt.cli:main"
-
